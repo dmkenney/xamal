@@ -46,7 +46,7 @@ If you use [asdf](https://asdf-vm.com/) to manage Elixir versions, run `asdf res
 # Generate config stubs and sample hooks
 xamal init
 
-# Edit config/deploy.yml and .kamal/secrets, then:
+# Edit config/deploy.yml and .xamal/secrets, then:
 xamal setup
 ```
 
@@ -111,7 +111,7 @@ xamal docs hooks          # Show hook documentation
 
 ## Hooks
 
-Shell scripts in `.kamal/hooks/` that run locally at lifecycle points:
+Shell scripts in `.xamal/hooks/` that run locally at lifecycle points:
 
 | Hook | When |
 |---|---|
@@ -134,7 +134,7 @@ xamal deploy -d staging
 xamal deploy -d production
 ```
 
-With override files like `config/deploy.staging.yml` and secrets in `.kamal/secrets.staging`.
+With override files like `config/deploy.staging.yml` and secrets in `.xamal/secrets.staging`.
 
 ## License
 
