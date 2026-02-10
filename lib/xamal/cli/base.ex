@@ -240,11 +240,10 @@ defmodule Xamal.CLI.Base do
     ssh_exec(host, Xamal.Commands.Caddy.reload(config), config)
     run_hook("post-caddy-reload", skip_hooks: skip_hooks)
 
-    # Wait drain_timeout, then stop old release
+    # Stop old release (systemd TimeoutStopSec handles drain)
     if active_port != new_port do
       drain = Xamal.Configuration.drain_timeout(config)
-      say("  Draining old release (#{drain}s)...", :magenta)
-      Process.sleep(drain * 1000)
+      say("  Stopping old release (#{drain}s drain timeout)...", :magenta)
       ssh_exec(host, Xamal.Commands.Systemd.stop(config, active_port), config)
     end
 

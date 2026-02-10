@@ -35,6 +35,14 @@ defmodule Xamal.Commands.SystemdTest do
       assert content =~ "WantedBy=multi-user.target"
     end
 
+    test "uses drain_timeout from config for TimeoutStopSec" do
+      config = %{@config | raw_config: Map.put(@config.raw_config, "drain_timeout", 10)}
+      content = Systemd.generate_unit_content(config)
+
+      assert content =~ "TimeoutStopSec=10"
+      refute content =~ "TimeoutStopSec=30"
+    end
+
     test "uses Type=exec" do
       content = Systemd.generate_unit_content(@config)
       assert content =~ "Type=exec"

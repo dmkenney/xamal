@@ -18,6 +18,7 @@ defmodule Xamal.Commands.Systemd do
     release_name = config.release.name
     service_dir = Xamal.Configuration.service_directory(config)
     user = config.ssh.user
+    drain_timeout = Xamal.Configuration.drain_timeout(config)
 
     """
     [Unit]
@@ -34,7 +35,7 @@ defmodule Xamal.Commands.Systemd do
     ExecStart=#{service_dir}/current/bin/#{release_name} start
     Restart=on-failure
     RestartSec=5
-    TimeoutStopSec=30
+    TimeoutStopSec=#{drain_timeout}
 
     [Install]
     WantedBy=multi-user.target
