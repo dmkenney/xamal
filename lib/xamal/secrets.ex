@@ -6,6 +6,8 @@ defmodule Xamal.Secrets do
   - .xamal/secrets-common (shared across destinations)
   - .xamal/secrets (or .xamal/secrets.<destination>)
   - Inline command substitution via $(...) syntax
+
+  Command substitutions are executed in parallel for performance.
   """
 
   defstruct [:destination, :secrets_path, :secrets, :files]
@@ -62,14 +64,19 @@ defmodule Xamal.Secrets do
   end
 
   defp load_secrets(files) do
-    files
-    |> Enum.filter(&File.exists?/1)
-    |> Enum.reduce(%{}, fn file, acc ->
-      Map.merge(acc, parse_dotenv(file))
-    end)
+    # First pass: parse all files, collecting raw values (no command substitution yet)
+    raw_secrets =
+      files
+      |> Enum.filter(&File.exists?/1)
+      |> Enum.reduce(%{}, fn file, acc ->
+        Map.merge(acc, parse_dotenv_raw(file))
+      end)
+
+    # Second pass: run all command substitutions in parallel
+    resolve_commands_parallel(raw_secrets)
   end
 
-  defp parse_dotenv(file) do
+  defp parse_dotenv_raw(file) do
     file
     |> File.read!()
     |> String.split("\n")
@@ -79,20 +86,42 @@ defmodule Xamal.Secrets do
       cond do
         line == "" -> acc
         String.starts_with?(line, "#") -> acc
-        true -> parse_env_line(line, acc)
+        true -> parse_env_line_raw(line, acc)
       end
     end)
   end
 
-  defp parse_env_line(line, acc) do
+  defp parse_env_line_raw(line, acc) do
     case String.split(line, "=", parts: 2) do
       [key, value] ->
         key = String.trim(key)
-        value = value |> String.trim() |> unquote_value() |> substitute_commands()
+        value = value |> String.trim() |> unquote_value()
         Map.put(acc, key, value)
 
       _ ->
         acc
+    end
+  end
+
+  defp resolve_commands_parallel(raw_secrets) do
+    {needs_sub, plain} =
+      Enum.split_with(raw_secrets, fn {_key, value} ->
+        String.contains?(value, "$(")
+      end)
+
+    if needs_sub == [] do
+      Map.new(plain)
+    else
+      resolved =
+        needs_sub
+        |> Task.async_stream(
+          fn {key, value} -> {key, substitute_commands(value)} end,
+          max_concurrency: 20,
+          timeout: 30_000
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      Map.new(plain ++ resolved)
     end
   end
 

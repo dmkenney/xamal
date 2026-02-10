@@ -102,6 +102,7 @@ defmodule Xamal.CLI.App do
       # Interactive: run on first host only via native Erlang SSH
       host = hd(hosts)
       active_port = read_active_port(host, config)
+
       cmd = Xamal.Commands.App.exec(config, command, interactive: true, port: active_port)
       cmd_str = Xamal.Commands.Base.to_command_string(cmd)
 

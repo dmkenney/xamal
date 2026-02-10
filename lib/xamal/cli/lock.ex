@@ -55,7 +55,9 @@ defmodule Xamal.CLI.Lock do
     cmd = Xamal.Commands.Lock.release(config)
 
     case on_primary(cmd) do
-      {:ok, _} -> say("Deploy lock released", :green)
+      {:ok, _} ->
+        say("Deploy lock released", :green)
+
       {:error, reason} ->
         say("Failed to release lock: #{inspect(reason)}", :red)
     end

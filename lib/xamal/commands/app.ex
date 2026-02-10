@@ -108,17 +108,21 @@ defmodule Xamal.Commands.App do
     port = Keyword.get(opts, :port)
     bin = release_bin(config)
     current = Xamal.Configuration.current_link(config)
+    env_file = "#{Xamal.Configuration.env_directory(config)}/app.env"
 
-    node_env =
-      if port do
-        "RELEASE_NODE=#{config.release.name}_#{port}"
-      end
+    # Source the env file so runtime.exs has the required env vars,
+    # and set RELEASE_NODE so we connect to the correct node.
+    env_prefix =
+      ["set -a", ". #{env_file}", "set +a"] ++
+        if(port, do: ["export RELEASE_NODE=#{config.release.name}_#{port}"], else: [])
+
+    shell_prefix = Enum.join(env_prefix, " && ")
 
     if interactive do
-      [node_env, "#{current}/#{bin}", "remote"] |> Enum.reject(&is_nil/1)
+      ["#{shell_prefix} &&", "#{current}/#{bin}", "remote"]
     else
       escaped = String.replace(command, "'", "'\\''")
-      [node_env, "#{current}/#{bin}", "rpc", "'#{escaped}'"] |> Enum.reject(&is_nil/1)
+      ["#{shell_prefix} &&", "#{current}/#{bin}", "rpc", "'#{escaped}'"]
     end
   end
 

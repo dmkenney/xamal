@@ -104,8 +104,11 @@ defmodule Xamal.SSH.ConnectionPool do
         connect_opts
 
     case :ssh.connect(host_charlist, port, opts, timeout) do
-      {:ok, conn} -> {:ok, conn}
-      {:error, reason} -> {:error, {:ssh_connection_failed, host, port, reason}}
+      {:ok, conn} ->
+        {:ok, conn}
+
+      {:error, reason} ->
+        {:error, {:ssh_connection_failed, host, port, reason}}
     end
   end
 end

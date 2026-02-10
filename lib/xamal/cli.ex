@@ -180,19 +180,30 @@ defmodule Xamal.CLI do
   end
 
   defp init_config(global_opts) do
-    config_file = Keyword.get(global_opts, :config_file, "config/deploy.yml")
-    destination = Keyword.get(global_opts, :destination)
-    version = Keyword.get(global_opts, :version)
+    # Return cached config if already loaded (avoids double load for alias dispatch)
+    case Process.get(:xamal_config) do
+      nil ->
+        config_file = Keyword.get(global_opts, :config_file, "config/deploy.yml")
+        destination = Keyword.get(global_opts, :destination)
+        version = Keyword.get(global_opts, :version)
 
-    # For init command, config may not exist yet
-    if File.exists?(config_file) do
-      Xamal.Configuration.create_from(
-        config_file: config_file,
-        destination: destination,
-        version: version
-      )
-    else
-      nil
+        # For init command, config may not exist yet
+        config =
+          if File.exists?(config_file) do
+            Xamal.Configuration.create_from(
+              config_file: config_file,
+              destination: destination,
+              version: version
+            )
+          else
+            nil
+          end
+
+        Process.put(:xamal_config, config)
+        config
+
+      config ->
+        config
     end
   end
 

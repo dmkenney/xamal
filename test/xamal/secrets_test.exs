@@ -65,6 +65,44 @@ defmodule Xamal.SecretsTest do
   end
 
   @tag :tmp_dir
+  test "multiple command substitutions run in parallel", %{tmp_dir: dir} do
+    secrets_path = Path.join(dir, "secrets")
+
+    # Each sleep 0.2s — sequential would take 0.6s+, parallel should be ~0.2s
+    File.write!(secrets_path, """
+    A=$(sleep 0.2 && echo aaa)
+    B=$(sleep 0.2 && echo bbb)
+    C=$(sleep 0.2 && echo ccc)
+    """)
+
+    t0 = System.monotonic_time(:millisecond)
+    secrets = Secrets.new(secrets_path: secrets_path)
+    elapsed = System.monotonic_time(:millisecond) - t0
+
+    assert Secrets.fetch(secrets, "A") == "aaa"
+    assert Secrets.fetch(secrets, "B") == "bbb"
+    assert Secrets.fetch(secrets, "C") == "ccc"
+    # Parallel: should complete well under 500ms (sequential would be 600ms+)
+    assert elapsed < 500
+  end
+
+  @tag :tmp_dir
+  test "mix of plain and command-substituted values", %{tmp_dir: dir} do
+    secrets_path = Path.join(dir, "secrets")
+
+    File.write!(secrets_path, """
+    PLAIN=hello
+    DYNAMIC=$(echo world)
+    ALSO_PLAIN=foo
+    """)
+
+    secrets = Secrets.new(secrets_path: secrets_path)
+    assert Secrets.fetch(secrets, "PLAIN") == "hello"
+    assert Secrets.fetch(secrets, "DYNAMIC") == "world"
+    assert Secrets.fetch(secrets, "ALSO_PLAIN") == "foo"
+  end
+
+  @tag :tmp_dir
   test "has_key? returns true/false", %{tmp_dir: dir} do
     secrets_path = Path.join(dir, "secrets")
     File.write!(secrets_path, "FOO=bar\n")

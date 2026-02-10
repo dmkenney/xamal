@@ -86,7 +86,9 @@ defmodule Xamal.Configuration.CaddyTest do
     end
 
     test "ssl false with multiple hosts" do
-      caddy = Caddy.new(%{"host" => "app.example.com", "hosts" => ["www.example.com"], "ssl" => false})
+      caddy =
+        Caddy.new(%{"host" => "app.example.com", "hosts" => ["www.example.com"], "ssl" => false})
+
       caddyfile = Caddy.generate_caddyfile(caddy, 4000)
 
       assert caddyfile =~ "http://app.example.com, http://www.example.com"
