@@ -36,6 +36,20 @@ defmodule Xamal.Commands.LockTest do
       assert cmd_str =~ "rm"
       assert cmd_str =~ "lock-my-app"
     end
+
+    test "does not use && so release succeeds even if details file is missing" do
+      cmd = Lock.release(@config)
+      cmd_str = Enum.join(cmd, " ")
+
+      refute cmd_str =~ "&&"
+    end
+  end
+
+  describe "ensure_locks_directory/1" do
+    test "creates parent run directory with mkdir -p" do
+      cmd = Lock.ensure_locks_directory(@config)
+      assert cmd == ["mkdir", "-p", "~/.xamal"]
+    end
   end
 
   describe "status/1" do

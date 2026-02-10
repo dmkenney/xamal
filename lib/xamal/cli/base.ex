@@ -309,6 +309,8 @@ defmodule Xamal.CLI.Base do
 
     say("Acquiring the deploy lock...", :magenta)
 
+    on_primary(Xamal.Commands.Lock.ensure_locks_directory(config))
+
     lock_cmd = Xamal.Commands.Lock.acquire(config, "Automatic deploy lock", config.version)
 
     case on_primary(lock_cmd) do
@@ -328,7 +330,7 @@ defmodule Xamal.CLI.Base do
           _ -> :ok
         end
 
-        raise "Deploy lock found. Run 'xamal lock help' for more information"
+        raise "Deploy lock found. Run 'xamal lock --help' for more information"
     end
   end
 

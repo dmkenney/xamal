@@ -19,10 +19,7 @@ defmodule Xamal.Commands.Lock do
   Release the deploy lock.
   """
   def release(config) do
-    combine([
-      remove_file(lock_details_file(config)),
-      remove_directory(lock_dir(config))
-    ])
+    remove_directory(lock_dir(config))
   end
 
   @doc """

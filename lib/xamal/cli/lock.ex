@@ -41,6 +41,7 @@ defmodule Xamal.CLI.Lock do
         true -> "Manual lock"
       end
 
+    on_primary(Xamal.Commands.Lock.ensure_locks_directory(config))
     cmd = Xamal.Commands.Lock.acquire(config, message, config.version)
 
     case on_primary(cmd) do
@@ -55,7 +56,8 @@ defmodule Xamal.CLI.Lock do
 
     case on_primary(cmd) do
       {:ok, _} -> say("Deploy lock released", :green)
-      {:error, _} -> say("Failed to release lock", :red)
+      {:error, reason} ->
+        say("Failed to release lock: #{inspect(reason)}", :red)
     end
   end
 
