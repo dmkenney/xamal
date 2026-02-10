@@ -17,6 +17,12 @@ defmodule Xamal.Configuration.CaddyTest do
       assert caddy.host == nil
       assert caddy.hosts == []
       assert caddy.app_port == 4000
+      assert caddy.ssl == true
+    end
+
+    test "ssl option" do
+      caddy = Caddy.new(%{"ssl" => false})
+      assert caddy.ssl == false
     end
 
     test "handles nil" do
@@ -69,6 +75,28 @@ defmodule Xamal.Configuration.CaddyTest do
 
       assert Regex.match?(~r/:80/, caddyfile)
       assert caddyfile =~ "reverse_proxy localhost:4000"
+    end
+
+    test "ssl false prefixes hosts with http://" do
+      caddy = Caddy.new(%{"host" => "app.example.com", "ssl" => false})
+      caddyfile = Caddy.generate_caddyfile(caddy, 4000)
+
+      assert caddyfile =~ "http://app.example.com"
+      assert caddyfile =~ "reverse_proxy localhost:4000"
+    end
+
+    test "ssl false with multiple hosts" do
+      caddy = Caddy.new(%{"host" => "app.example.com", "hosts" => ["www.example.com"], "ssl" => false})
+      caddyfile = Caddy.generate_caddyfile(caddy, 4000)
+
+      assert caddyfile =~ "http://app.example.com, http://www.example.com"
+    end
+
+    test "ssl false without hosts still uses port 80" do
+      caddy = Caddy.new(%{"ssl" => false})
+      caddyfile = Caddy.generate_caddyfile(caddy, 4000)
+
+      assert caddyfile =~ ":80"
     end
   end
 

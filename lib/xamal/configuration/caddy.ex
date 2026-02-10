@@ -6,18 +6,20 @@ defmodule Xamal.Configuration.Caddy do
   defstruct [
     :host,
     :hosts,
-    :app_port
+    :app_port,
+    :ssl
   ]
 
   def new(config) when is_map(config) do
     %__MODULE__{
       host: Map.get(config, "host"),
       hosts: Map.get(config, "hosts", []),
-      app_port: Map.get(config, "app_port", 4000)
+      app_port: Map.get(config, "app_port", 4000),
+      ssl: Map.get(config, "ssl", true)
     }
   end
 
-  def new(_), do: %__MODULE__{app_port: 4000, hosts: []}
+  def new(_), do: %__MODULE__{app_port: 4000, hosts: [], ssl: true}
 
   @doc """
   Returns all configured hostnames for the Caddyfile.
@@ -50,6 +52,7 @@ defmodule Xamal.Configuration.Caddy do
     matcher =
       case hostnames(caddy) do
         [] -> ":80"
+        hosts when caddy.ssl == false -> hosts |> Enum.map(&"http://#{&1}") |> Enum.join(", ")
         hosts -> Enum.join(hosts, ", ")
       end
 

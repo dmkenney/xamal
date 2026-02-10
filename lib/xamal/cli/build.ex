@@ -23,11 +23,18 @@ defmodule Xamal.CLI.Build do
 
   def push(_args, _opts) do
     config = Xamal.Commander.config()
+    docker? = Xamal.Configuration.Builder.docker?(config.builder)
 
-    say("Building release locally...", :magenta)
+    if docker? do
+      verify_docker_available!()
+      image = Xamal.Configuration.Builder.docker_image(config.builder)
+      say("Building release in Docker (#{image})...", :magenta)
+    else
+      say("Building release locally...", :magenta)
+    end
 
     build_cmd =
-      if Xamal.Configuration.Builder.docker?(config.builder) do
+      if docker? do
         Xamal.Commands.Builder.build_in_docker(config)
       else
         Xamal.Commands.Builder.build_release(config)
@@ -48,9 +55,52 @@ defmodule Xamal.CLI.Build do
           {output, _} -> raise "Failed to create tarball: #{output}"
         end
 
+      {_, code} when docker? ->
+        image = Xamal.Configuration.Builder.docker_image(config.builder)
+
+        raise """
+        Docker build failed with exit code #{code}.
+
+        Image: #{image}
+
+        This usually means:
+          - The Docker image does not exist on the registry (check the tag)
+          - Docker cannot pull the image (check network/auth)
+          - The build commands failed inside the container
+
+        To debug, try:
+          docker pull #{image}
+        """
+
       {_, code} ->
         raise "Build failed with exit code #{code}"
     end
+  end
+
+  defp verify_docker_available! do
+    case System.cmd("docker", ["info"], stderr_to_stdout: true) do
+      {_, 0} ->
+        :ok
+
+      {_, _} ->
+        raise """
+        Docker is not available.
+
+        The builder is configured to use Docker but the 'docker' command is not \
+        working. Make sure Docker is installed and running.
+        """
+    end
+  rescue
+    e in ErlangError ->
+      raise """
+      Docker is not installed.
+
+      The builder is configured to use Docker but the 'docker' command was not \
+      found. Install Docker to use Docker-based builds, or remove the 'docker' \
+      setting from your builder configuration.
+
+      Original error: #{inspect(e)}
+      """
   end
 
   def pull(_args, _opts) do

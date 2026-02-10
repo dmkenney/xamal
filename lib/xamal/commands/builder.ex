@@ -70,25 +70,42 @@ defmodule Xamal.Commands.Builder do
 
   @doc """
   Build the release inside a Docker container for cross-compilation.
+
+  The Docker image can be configured via `builder.docker` in deploy.yml:
+  - `docker: true` uses a default hexpm/elixir image
+  - `docker: "image:tag"` uses the specified image
+
+  Builder args from `builder.args` are passed as environment variables via `-e` flags.
   """
   def build_in_docker(config) do
+    image = Xamal.Configuration.Builder.docker_image(config.builder)
     release_name = config.release.name
     mix_env = config.release.mix_env
 
-    combine([
+    env_flags =
+      (config.builder.args || %{})
+      |> Enum.flat_map(fn {k, v} -> ["-e", "#{k}=#{v}"] end)
+
+    # Use host UID/GID so build artifacts aren't owned by root
+    build_steps =
       [
-        "docker",
-        "run",
-        "--rm",
-        "-v",
-        "$(pwd):/app",
-        "-w",
-        "/app",
-        "hexpm/elixir:1.18.3-erlang-27.2.3-debian-bookworm-20250113",
-        "sh",
-        "-c",
-        "'mix local.hex --force && mix local.rebar --force && MIX_ENV=#{mix_env} mix deps.get --only #{mix_env} && MIX_ENV=#{mix_env} mix release #{release_name} --overwrite'"
+        "apt-get update -qq && apt-get install -y -qq git build-essential >/dev/null 2>&1",
+        "mix local.hex --force",
+        "mix local.rebar --force",
+        "MIX_ENV=#{mix_env} mix deps.get --only #{mix_env}",
+        "MIX_ENV=#{mix_env} mix deps.compile",
+        "mix tailwind.install --if-missing",
+        "mix esbuild.install --if-missing",
+        "MIX_ENV=#{mix_env} mix assets.deploy",
+        "MIX_ENV=#{mix_env} mix release #{release_name} --overwrite",
+        "chown -R $(stat -c '%u:%g' /app) /app/_build /app/deps /app/priv/static"
       ]
+      |> Enum.join(" && ")
+
+    combine([
+      ["docker", "run", "--rm", "-v", "$(pwd):/app", "-w", "/app"] ++
+        env_flags ++
+        [image, "sh", "-c", "'#{build_steps}'"]
     ])
   end
 

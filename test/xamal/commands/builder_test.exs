@@ -65,15 +65,71 @@ defmodule Xamal.Commands.BuilderTest do
   end
 
   describe "build_in_docker/1" do
-    test "builds docker run command" do
+    test "builds docker run command with default image" do
       cmd = Builder.build_in_docker(@config)
       cmd_str = Enum.join(cmd, " ")
 
       assert cmd_str =~ "docker run --rm"
       assert cmd_str =~ "-v $(pwd):/app"
+      assert cmd_str =~ "-w /app"
       assert cmd_str =~ "hexpm/elixir"
-      assert cmd_str =~ "MIX_ENV=prod"
-      assert cmd_str =~ "mix release my_app"
+      assert cmd_str =~ "sh -c"
+    end
+
+    test "uses custom image when docker is a string" do
+      config = put_in(@config.builder, %Xamal.Configuration.Builder{docker: "my-org/elixir:1.18"})
+      cmd = Builder.build_in_docker(config)
+      cmd_str = Enum.join(cmd, " ")
+
+      assert cmd_str =~ "my-org/elixir:1.18"
+      refute cmd_str =~ "hexpm/elixir"
+    end
+
+    test "includes build steps" do
+      cmd = Builder.build_in_docker(@config)
+      cmd_str = Enum.join(cmd, " ")
+
+      assert cmd_str =~ "apt-get update"
+      assert cmd_str =~ "mix local.hex --force"
+      assert cmd_str =~ "mix local.rebar --force"
+      assert cmd_str =~ "MIX_ENV=prod mix deps.get --only prod"
+      assert cmd_str =~ "MIX_ENV=prod mix deps.compile"
+      assert cmd_str =~ "mix tailwind.install --if-missing"
+      assert cmd_str =~ "mix esbuild.install --if-missing"
+      assert cmd_str =~ "MIX_ENV=prod mix assets.deploy"
+      assert cmd_str =~ "MIX_ENV=prod mix release my_app --overwrite"
+      assert cmd_str =~ "chown -R"
+    end
+
+    test "passes builder args as env flags" do
+      config = put_in(@config.builder, %Xamal.Configuration.Builder{
+        docker: true,
+        args: %{"HEX_KEY" => "secret123", "MIX_DEBUG" => "1"}
+      })
+      cmd = Builder.build_in_docker(config)
+      cmd_str = Enum.join(cmd, " ")
+
+      assert cmd_str =~ "-e HEX_KEY=secret123"
+      assert cmd_str =~ "-e MIX_DEBUG=1"
+    end
+
+    test "no env flags when args is nil" do
+      config = put_in(@config.builder, %Xamal.Configuration.Builder{docker: true, args: nil})
+      cmd = Builder.build_in_docker(config)
+      cmd_str = Enum.join(cmd, " ")
+
+      # Should not have any -e flags (except inside the sh -c script)
+      [before_sh | _] = String.split(cmd_str, "sh -c")
+      refute before_sh =~ "-e "
+    end
+
+    test "no env flags when args is empty" do
+      config = put_in(@config.builder, %Xamal.Configuration.Builder{docker: true, args: %{}})
+      cmd = Builder.build_in_docker(config)
+      cmd_str = Enum.join(cmd, " ")
+
+      [before_sh | _] = String.split(cmd_str, "sh -c")
+      refute before_sh =~ "-e "
     end
   end
 

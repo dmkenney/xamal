@@ -12,11 +12,18 @@ defmodule Xamal.Configuration.BuilderTest do
       assert builder.remote == nil
     end
 
-    test "docker mode" do
+    test "docker mode with true" do
       builder = Builder.new(%{"docker" => true, "local" => false})
 
       assert builder.local == false
       assert builder.docker == true
+    end
+
+    test "docker mode with custom image" do
+      builder = Builder.new(%{"docker" => "my-org/elixir:1.18", "local" => false})
+
+      assert builder.local == false
+      assert builder.docker == "my-org/elixir:1.18"
     end
 
     test "remote mode" do
@@ -41,11 +48,31 @@ defmodule Xamal.Configuration.BuilderTest do
     test "docker?/1" do
       refute Builder.docker?(Builder.new(%{}))
       assert Builder.docker?(Builder.new(%{"docker" => true}))
+      assert Builder.docker?(Builder.new(%{"docker" => "my-image:latest"}))
+      refute Builder.docker?(Builder.new(%{"docker" => false}))
+      refute Builder.docker?(Builder.new(%{"docker" => nil}))
     end
 
     test "remote?/1" do
       refute Builder.remote?(Builder.new(%{}))
       assert Builder.remote?(Builder.new(%{"remote" => "build@server"}))
+    end
+  end
+
+  describe "docker_image/1" do
+    test "returns custom image when docker is a string" do
+      builder = Builder.new(%{"docker" => "my-org/elixir:1.18"})
+      assert Builder.docker_image(builder) == "my-org/elixir:1.18"
+    end
+
+    test "returns default image when docker is true" do
+      builder = Builder.new(%{"docker" => true})
+      assert Builder.docker_image(builder) =~ "hexpm/elixir"
+    end
+
+    test "returns default image when docker is false" do
+      builder = Builder.new(%{})
+      assert Builder.docker_image(builder) =~ "hexpm/elixir"
     end
   end
 end
