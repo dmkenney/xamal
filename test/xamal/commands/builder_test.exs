@@ -89,9 +89,10 @@ defmodule Xamal.Commands.BuilderTest do
       cmd = Builder.build_in_docker(@config)
       cmd_str = Enum.join(cmd, " ")
 
+      assert cmd_str =~ "command -v git"
       assert cmd_str =~ "apt-get update"
-      assert cmd_str =~ "mix local.hex --force"
-      assert cmd_str =~ "mix local.rebar --force"
+      assert cmd_str =~ "mix local.hex --if-missing --force"
+      assert cmd_str =~ "mix local.rebar --if-missing --force"
       assert cmd_str =~ "MIX_ENV=prod mix deps.get --only prod"
       assert cmd_str =~ "MIX_ENV=prod mix deps.compile"
       assert cmd_str =~ "mix tailwind.install --if-missing"
@@ -101,11 +102,38 @@ defmodule Xamal.Commands.BuilderTest do
       assert cmd_str =~ "chown -R"
     end
 
+    test "includes volume flags when configured" do
+      config =
+        put_in(@config.builder, %Xamal.Configuration.Builder{
+          docker: true,
+          volumes: ["xamal-hex-cache:/root/.hex", "xamal-mix-cache:/root/.mix"]
+        })
+
+      cmd = Builder.build_in_docker(config)
+      cmd_str = Enum.join(cmd, " ")
+
+      assert cmd_str =~ "-v xamal-hex-cache:/root/.hex"
+      assert cmd_str =~ "-v xamal-mix-cache:/root/.mix"
+    end
+
+    test "no volume flags when volumes is empty" do
+      config = put_in(@config.builder, %Xamal.Configuration.Builder{docker: true, volumes: []})
+      cmd = Builder.build_in_docker(config)
+      cmd_str = Enum.join(cmd, " ")
+
+      # Only the $(pwd):/app volume mount should appear before sh -c
+      [before_sh | _] = String.split(cmd_str, "sh -c")
+      volumes = Regex.scan(~r/-v\s+\S+/, before_sh)
+      assert length(volumes) == 1
+    end
+
     test "passes builder args as env flags" do
-      config = put_in(@config.builder, %Xamal.Configuration.Builder{
-        docker: true,
-        args: %{"HEX_KEY" => "secret123", "MIX_DEBUG" => "1"}
-      })
+      config =
+        put_in(@config.builder, %Xamal.Configuration.Builder{
+          docker: true,
+          args: %{"HEX_KEY" => "secret123", "MIX_DEBUG" => "1"}
+        })
+
       cmd = Builder.build_in_docker(config)
       cmd_str = Enum.join(cmd, " ")
 

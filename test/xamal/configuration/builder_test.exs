@@ -10,6 +10,7 @@ defmodule Xamal.Configuration.BuilderTest do
       assert builder.local == true
       assert builder.docker == false
       assert builder.remote == nil
+      assert builder.volumes == []
     end
 
     test "docker mode with true" do
@@ -36,6 +37,18 @@ defmodule Xamal.Configuration.BuilderTest do
       builder = Builder.new(%{"args" => %{"ELIXIR_VERSION" => "1.18.3"}})
 
       assert builder.args == %{"ELIXIR_VERSION" => "1.18.3"}
+    end
+
+    test "volumes" do
+      builder = Builder.new(%{"volumes" => ["hex-cache:/root/.hex", "mix-cache:/root/.mix"]})
+
+      assert builder.volumes == ["hex-cache:/root/.hex", "mix-cache:/root/.mix"]
+    end
+
+    test "volumes defaults to empty list" do
+      builder = Builder.new(%{"docker" => true})
+
+      assert builder.volumes == []
     end
   end
 

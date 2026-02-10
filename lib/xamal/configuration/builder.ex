@@ -7,7 +7,8 @@ defmodule Xamal.Configuration.Builder do
     :local,
     :docker,
     :remote,
-    :args
+    :args,
+    volumes: []
   ]
 
   def new(config) when is_map(config) do
@@ -15,11 +16,12 @@ defmodule Xamal.Configuration.Builder do
       local: Map.get(config, "local", true),
       docker: Map.get(config, "docker", false),
       remote: Map.get(config, "remote"),
-      args: Map.get(config, "args", %{})
+      args: Map.get(config, "args", %{}),
+      volumes: Map.get(config, "volumes", [])
     }
   end
 
-  def new(_), do: %__MODULE__{local: true, docker: false, args: %{}}
+  def new(_), do: %__MODULE__{local: true, docker: false, args: %{}, volumes: []}
 
   def local?(%__MODULE__{local: true}), do: true
   def local?(_), do: false

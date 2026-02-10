@@ -86,12 +86,16 @@ defmodule Xamal.Commands.Builder do
       (config.builder.args || %{})
       |> Enum.flat_map(fn {k, v} -> ["-e", "#{k}=#{v}"] end)
 
+    volume_flags =
+      (config.builder.volumes || [])
+      |> Enum.flat_map(fn vol -> ["-v", vol] end)
+
     # Use host UID/GID so build artifacts aren't owned by root
     build_steps =
       [
-        "apt-get update -qq && apt-get install -y -qq git build-essential >/dev/null 2>&1",
-        "mix local.hex --force",
-        "mix local.rebar --force",
+        "command -v git >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq git build-essential >/dev/null 2>&1)",
+        "mix local.hex --if-missing --force",
+        "mix local.rebar --if-missing --force",
         "MIX_ENV=#{mix_env} mix deps.get --only #{mix_env}",
         "MIX_ENV=#{mix_env} mix deps.compile",
         "mix tailwind.install --if-missing",
@@ -104,6 +108,7 @@ defmodule Xamal.Commands.Builder do
 
     combine([
       ["docker", "run", "--rm", "-v", "$(pwd):/app", "-w", "/app"] ++
+        volume_flags ++
         env_flags ++
         [image, "sh", "-c", "'#{build_steps}'"]
     ])
