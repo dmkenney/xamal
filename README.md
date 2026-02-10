@@ -90,6 +90,24 @@ health_check:
   path: /health
 ```
 
+**Important:** The `release.name` must match a named release in your `mix.exs`. Xamal runs `mix release <name>`, which requires an explicit release definition:
+
+```elixir
+# mix.exs
+def project do
+  [
+    ...
+    releases: [
+      my_app: [
+        version: {:from_app, :my_app}
+      ]
+    ]
+  ]
+end
+```
+
+Without this, `mix release my_app` will fail with `Unknown release :my_app`.
+
 EEx templating is supported (`<%= env["KEY"] %>`, `<%= System.get_env("KEY") %>`).
 
 Run `xamal docs <topic>` for detailed reference on any config section.
