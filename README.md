@@ -24,21 +24,24 @@ mix deps.get
 mix escript.build
 ```
 
-This produces a `xamal` binary in the project root. Install it to your PATH:
+This produces a `xamal` binary in the project root. Copy it somewhere on your `$PATH`:
 
 ```sh
-mix escript.install
+mkdir -p ~/.local/bin
+cp xamal ~/.local/bin/
 ```
 
-This places the binary in `~/.mix/escripts/`. Make sure that directory is on your `$PATH`:
+Make sure `~/.local/bin` is on your `$PATH` (add to `~/.bashrc` or `~/.zshrc`):
 
 ```sh
-export PATH="$PATH:$HOME/.mix/escripts"
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Add that line to your `~/.bashrc` or `~/.zshrc` to make it permanent.
+### Why not `mix escript.install`?
 
-If you use [asdf](https://asdf-vm.com/) to manage Elixir versions, run `asdf reshim elixir` after installing.
+You can also install with `mix escript.install`, which places the binary in `~/.mix/escripts/`. However, if you use [asdf](https://asdf-vm.com/) to manage Elixir versions, the escript gets registered under whichever Elixir version was active when you installed it. If you then `cd` into a project that pins a different Elixir version in `.tool-versions`, asdf's shim will refuse to run xamal. You'd need to reinstall the escript every time you switch versions.
+
+Copying the binary directly to `~/.local/bin` avoids this entirely since it bypasses asdf's shim system. Just make sure `~/.local/bin` appears on your `$PATH` **before** asdf's shims directory.
 
 ## Quick start
 
