@@ -121,11 +121,14 @@ mix xamal.remove              # Remove remote release and proxy resources
 
 ```
 mix xamal.app.boot            # Zero-downtime restart
+mix xamal.app.start           # Start the service on its active port (no swap)
+mix xamal.app.stop            # Stop application services
 mix xamal.app.exec CMD        # Run a command in the release context
 mix xamal.app.logs -f         # Tail application logs
+mix xamal.app.version         # Show the current deployed version per host
+mix xamal.app.stale_releases  # Preview releases that pruning would remove
 mix xamal.app.maintenance     # Enable maintenance mode (503)
 mix xamal.app.live            # Disable maintenance mode
-mix xamal.app.stop            # Stop application services
 mix xamal.shell               # Open a remote shell on the running release
 mix xamal.iex                 # Open a remote IEx session
 mix xamal.migrate             # Run the release migrator (<App>.Release.migrate)

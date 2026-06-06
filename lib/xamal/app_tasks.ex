@@ -89,6 +89,62 @@ defmodule Xamal.AppTasks do
   end
 
   @doc """
+  Starts the systemd service on the currently active port without a full boot.
+
+  Use this to bring an app back up after `mix xamal.app.stop`; `mix xamal.app.boot`
+  performs the heavier zero-downtime swap instead.
+  """
+  def start(_args, _opts, context) do
+    config = context.config
+
+    Enum.each(Context.hosts(context), fn host ->
+      active_port = read_active_port(host, config) || config.caddy.app_port
+      say("  Starting on #{host} (port #{active_port})...", :magenta)
+      cmd = Systemd.start(config, active_port)
+
+      case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
+        {:ok, _} -> say("  Started on #{host} (port #{active_port})", :green)
+        {:error, reason} -> say("  Error on #{host}: #{inspect(reason)}", :red)
+      end
+    end)
+  end
+
+  @doc """
+  Prints the current release version on the selected hosts.
+
+  See also `mix xamal.versions`, which lists every release and marks the current one.
+  """
+  def version(_args, _opts, context) do
+    config = context.config
+
+    Enum.each(Context.hosts(context), fn host ->
+      case SSH.execute_command(host, AppCommand.current_version(config), ssh_config: config.ssh) do
+        {:ok, output} -> puts_by_host(host, String.trim(output), type: "Version")
+        {:error, _} -> puts_by_host(host, "(unknown)", type: "Version")
+      end
+    end)
+  end
+
+  @doc """
+  Lists releases that would be removed by pruning (a read-only preview).
+
+  `mix xamal.prune` performs the actual removal.
+  """
+  def stale_releases(_args, _opts, context) do
+    config = context.config
+    keep = Configuration.retain_releases(config)
+
+    Enum.each(Context.hosts(context), fn host ->
+      cmd = AppCommand.stale_releases(config, keep)
+
+      case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
+        {:ok, output} -> puts_by_host(host, output, type: "Stale Releases")
+        {:error, _} -> puts_by_host(host, "(none)", type: "Stale Releases")
+      end
+    end)
+  end
+
+  @doc """
   Opens an interactive remote shell (IEx) connected to the running release.
 
   Convenience wrapper for `mix xamal.app.exec -i`.
