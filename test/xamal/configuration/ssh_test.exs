@@ -62,5 +62,21 @@ defmodule Xamal.Configuration.SshTest do
 
       assert Keyword.has_key?(opts, :user_dir)
     end
+
+    test "expands a leading ~ in the key path for user_dir" do
+      ssh = Ssh.new(%{"keys" => ["~/.ssh/id_ed25519"]})
+      user_dir = ssh |> Ssh.connect_options() |> Keyword.get(:user_dir)
+
+      # Erlang's :ssh does not expand ~; it must already be an absolute path.
+      assert user_dir == String.to_charlist(Path.expand("~/.ssh"))
+      refute List.starts_with?(user_dir, ~c"~")
+    end
+
+    test "passes through an absolute key path unchanged" do
+      ssh = Ssh.new(%{"keys" => ["/etc/xamal/keys/id_ed25519"]})
+      user_dir = ssh |> Ssh.connect_options() |> Keyword.get(:user_dir)
+
+      assert user_dir == ~c"/etc/xamal/keys"
+    end
   end
 end

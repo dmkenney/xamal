@@ -56,7 +56,10 @@ defmodule Xamal.Configuration.Ssh do
   end
 
   defp put_key_options(opts, %{keys: keys}) when not is_nil(keys) do
-    opts ++ [user_dir: keys |> hd() |> Path.dirname() |> String.to_charlist()]
+    # Path.expand resolves a leading ~ — Erlang's :ssh does not, and would
+    # otherwise stat a literal "~/.ssh" directory and fail with :enoent.
+    user_dir = keys |> hd() |> Path.expand() |> Path.dirname() |> String.to_charlist()
+    opts ++ [user_dir: user_dir]
   end
 
   defp put_key_options(opts, _ssh), do: opts
