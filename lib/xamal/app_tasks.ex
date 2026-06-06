@@ -88,6 +88,50 @@ defmodule Xamal.AppTasks do
     run_hook("post-caddy-reload", [skip_hooks: skip_hooks], context)
   end
 
+  @doc """
+  Opens an interactive remote shell (IEx) connected to the running release.
+
+  Convenience wrapper for `mix xamal.app.exec -i`.
+  """
+  def shell(_args, opts, context) do
+    exec(["-i"], opts, context)
+  end
+
+  @doc """
+  Opens an interactive remote IEx session connected to the running release.
+
+  Alias of `shell/3`; both connect via the release's `remote` command.
+  """
+  def iex(_args, opts, context) do
+    exec(["-i"], opts, context)
+  end
+
+  @doc """
+  Runs the release migrator on the selected hosts.
+
+  Calls `<AppModule>.Release.migrate()` via the release's RPC, following the
+  conventional `mix phx.gen.release`-style `Release` module. Override the module
+  by passing it as an argument, e.g. `mix xamal.migrate MyApp.Release`.
+  """
+  def migrate(args, opts, context) do
+    module = migrate_module(args, context.config)
+    exec(["#{module}.migrate()"], opts, context)
+  end
+
+  defp migrate_module([module | _], _config) when is_binary(module) and module != "" do
+    String.trim_trailing(module, ".migrate()")
+  end
+
+  defp migrate_module(_args, config) do
+    "#{release_module(config)}.Release"
+  end
+
+  defp release_module(config) do
+    config.release.name
+    |> String.split("_")
+    |> Enum.map_join(&String.capitalize/1)
+  end
+
   def live(_args, opts, context) do
     config = context.config
     hosts = Context.hosts(context)
