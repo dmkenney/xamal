@@ -50,6 +50,12 @@ mix deps.get
 
 Documentation is available on [HexDocs](https://hexdocs.pm/xamal).
 
+## Upgrading
+
+Upgrading from 0.2.0? The escript binary, the `xamal <cmd>` interface, and
+`config/deploy.yml` were all replaced in 0.3.0. See [UPGRADING.md](UPGRADING.md)
+for step-by-step migration instructions.
+
 ## Quick start
 
 ```sh

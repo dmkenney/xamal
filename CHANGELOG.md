@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.3.0]
 
+See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
+
 ### Added
 
 - New `mix xamal.prune` task to remove old releases beyond the retained count.
@@ -21,17 +23,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** Replaced the escript CLI with Mix tasks (`mix xamal.*`) as the
+  public command surface. Invoke commands via `mix xamal.<task>` instead of the
+  previous `xamal` escript binary, and install Xamal as a Mix dependency rather
+  than a standalone binary.
+- **Breaking:** Configuration is now Elixir config in `config/xamal.exs` instead
+  of `config/deploy.yml`, with destination overrides in
+  `config/xamal/<destination>.exs`. EEx templating is replaced by plain Elixir
+  expressions (e.g. `System.get_env/1`).
 - Mix tasks are grouped under a "Mix Tasks" section in the generated docs.
+
+### Removed
+
+- The `xamal` escript binary and the `install.sh` installer that downloaded it.
 
 ## [0.2.0]
 
 ### Changed
 
-- Replaced the escript CLI with Mix tasks (`mix xamal.*`) as the public command
-  surface. **Breaking:** invoke commands via `mix xamal.<task>` instead of the
-  previous `xamal` escript binary.
-- Configuration is now Elixir config in `config/xamal.exs`, with destination
-  overrides in `config/xamal/<destination>.exs`.
+- Internal refactors toward the Mix-first architecture. No user-facing changes.
 
 ## [0.1.0]
 

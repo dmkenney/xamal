@@ -36,7 +36,7 @@ defmodule Xamal.MixProject do
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md"
       },
-      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md)
+      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md UPGRADING.md)
     ]
   end
 
@@ -44,7 +44,7 @@ defmodule Xamal.MixProject do
     [
       main: "readme",
       source_ref: "v#{@version}",
-      extras: ["README.md", "CHANGELOG.md", "LICENSE"],
+      extras: ["README.md", "UPGRADING.md", "CHANGELOG.md", "LICENSE"],
       groups_for_modules: [
         "Mix Tasks": [~r/Mix\.Tasks\.Xamal/]
       ]
