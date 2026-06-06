@@ -5,33 +5,32 @@ on:
     tags:
       - "v*"
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
-        with:
-          elixir-version: "1.15"
-          otp-version: "26"
-      - run: mix deps.get
-      - run: mix escript.build
-      - run: mix escript.install --force
-      - run: mix test
+permissions:
+  contents: read
 
-  release:
-    needs: test
+jobs:
+  publish:
+    name: Publish to Hex
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.15"
-          otp-version: "26"
+          elixir-version: "1.18"
+          otp-version: "27"
+
       - run: mix deps.get
-      - run: mix escript.build
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: xamal
+
+      - name: Verify build
+        env:
+          MIX_ENV: test
+        run: |
+          mix dialyzer --plt
+          mix ci
+
+      - name: Publish package
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: mix hex.publish --yes
