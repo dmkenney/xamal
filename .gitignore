@@ -9,3 +9,4 @@ erl_crash.dump
 /tmp/
 .elixir_ls/
 .envrc
+.claude/

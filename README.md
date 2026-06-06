@@ -1,5 +1,9 @@
 # Xamal
 
+[![Hex.pm](https://img.shields.io/hexpm/v/xamal.svg)](https://hex.pm/packages/xamal)
+[![Hexdocs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/xamal)
+[![License](https://img.shields.io/hexpm/l/xamal.svg)](https://github.com/dmkenney/xamal/blob/master/LICENSE)
+
 Xamal is an Elixir port of [Kamal](https://github.com/basecamp/kamal) — Basecamp's tool for deploying web apps anywhere. It uses Mix tasks, Elixir configuration (`config/xamal.exs`), native releases, and Caddy instead of Docker containers and kamal-proxy.
 
 If you're familiar with Kamal, you should feel right at home. The operational model, hook system, secrets management, and destination-based multi-environment workflow carry over.
@@ -21,7 +25,7 @@ Add Xamal as a Mix dependency in the application you deploy:
 # mix.exs
 defp deps do
   [
-    {:xamal, github: "dmkenney/xamal", only: [:dev, :test], runtime: false}
+    {:xamal, "~> 0.3", only: [:dev, :test], runtime: false}
   ]
 end
 ```
@@ -31,6 +35,8 @@ Then fetch dependencies:
 ```sh
 mix deps.get
 ```
+
+Documentation is available on [HexDocs](https://hexdocs.pm/xamal).
 
 ## Quick start
 
