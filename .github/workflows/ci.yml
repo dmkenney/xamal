@@ -22,7 +22,7 @@ jobs:
           otp-version: "28"
 
       - name: Restore deps and build cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             deps
@@ -35,7 +35,7 @@ jobs:
       # cached separately so it survives mix.lock changes that don't touch it.
       # Keyed on the Elixir/OTP version too — a PLT is invalid across OTP versions.
       - name: Restore Dialyzer PLT cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: _build/dev/dialyxir_plt.plt
           key: ${{ runner.os }}-plt-elixir1.20-otp28-${{ hashFiles('mix.lock') }}
@@ -81,7 +81,7 @@ jobs:
           otp-version: ${{ matrix.otp }}
 
       - name: Restore deps and build cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             deps
