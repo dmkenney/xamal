@@ -62,7 +62,7 @@ defmodule Xamal.MixProject do
   end
 
   def cli do
-    [preferred_envs: [ci: :test]]
+    [preferred_envs: [ci: :test, "ci.lint": :test, "ci.test": :test]]
   end
 
   defp deps do
@@ -79,15 +79,21 @@ defmodule Xamal.MixProject do
 
   defp aliases do
     [
-      ci: [
-        "compile --warnings-as-errors",
+      # Version-independent style and type checks. Run once in CI on the latest
+      # Elixir; running them per-version adds cost without extra signal.
+      "ci.lint": [
         "format --check-formatted",
         "credo --strict",
         "ex_dna",
         "reach.check --arch --smells",
-        "dialyzer",
+        "dialyzer"
+      ],
+      # Version-dependent checks. Run across the full Elixir matrix in CI.
+      "ci.test": [
+        "compile --warnings-as-errors",
         "test"
-      ]
+      ],
+      ci: ["ci.lint", "ci.test"]
     ]
   end
 end
