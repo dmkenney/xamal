@@ -17,6 +17,18 @@ If you're familiar with Kamal, you should feel right at home. The operational mo
 
 Docker-specific configuration (image, registry, Dockerfile, build args, etc.) is intentionally omitted since releases replace containers entirely.
 
+## Requirements
+
+**Locally**, where you run the Mix tasks:
+
+- Elixir 1.15+ / OTP 26+ and an environment that can build a release (`mix release`)
+- SSH access to your target servers
+
+**On each target server:**
+
+- A systemd-based Linux host with SSH enabled
+- Caddy — `mix xamal.server.bootstrap` (run as part of `mix xamal.setup`) installs Caddy and the systemd service unit for you if they are not already present
+
 ## Install
 
 Add Xamal as a Mix dependency in the application you deploy:
@@ -47,6 +59,10 @@ mix xamal.init
 # Edit config/xamal.exs and .xamal/secrets, then:
 mix xamal.setup
 ```
+
+Xamal ships built-in reference docs for every config section. Run `mix xamal.docs`
+to list the available topics, or `mix xamal.docs <topic>` (e.g. `mix xamal.docs servers`)
+for details.
 
 ## Configuration
 
