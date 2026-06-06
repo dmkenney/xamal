@@ -27,6 +27,24 @@ defmodule Xamal.UtilsTest do
     end
   end
 
+  describe "to_module_name/1" do
+    test "converts a single-word release name" do
+      assert Utils.to_module_name("brightsite") == "Brightsite"
+    end
+
+    test "converts an underscored release name to PascalCase" do
+      assert Utils.to_module_name("my_app") == "MyApp"
+    end
+
+    test "handles multiple underscores" do
+      assert Utils.to_module_name("my_cool_app") == "MyCoolApp"
+    end
+
+    test "ignores leading and trailing underscores" do
+      assert Utils.to_module_name("_my_app_") == "MyApp"
+    end
+  end
+
   describe "parse_host_port/1" do
     test "parses host:port" do
       assert Utils.parse_host_port("example.com:2222") == {"example.com", 2222}

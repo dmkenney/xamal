@@ -39,6 +39,18 @@ defmodule Xamal.Utils do
   end
 
   @doc """
+  Convert an underscored release name to a PascalCase module name.
+
+      iex> Xamal.Utils.to_module_name("my_app")
+      "MyApp"
+  """
+  def to_module_name(release_name) when is_binary(release_name) do
+    release_name
+    |> String.split("_", trim: true)
+    |> Enum.map_join(&String.capitalize/1)
+  end
+
+  @doc """
   Check if the git working tree has uncommitted or staged changes.
   """
   def git_dirty? do

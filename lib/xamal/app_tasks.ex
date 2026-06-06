@@ -15,6 +15,7 @@ defmodule Xamal.AppTasks do
   alias Xamal.Context
   alias Xamal.EnvFile
   alias Xamal.SSH
+  alias Xamal.Utils
 
   def boot(_args, opts, context) do
     config = context.config
@@ -86,6 +87,100 @@ defmodule Xamal.AppTasks do
     end)
 
     run_hook("post-caddy-reload", [skip_hooks: skip_hooks], context)
+  end
+
+  @doc """
+  Starts the systemd service on the currently active port without a full boot.
+
+  Use this to bring an app back up after `mix xamal.app.stop`; `mix xamal.app.boot`
+  performs the heavier zero-downtime swap instead.
+  """
+  def start(_args, _opts, context) do
+    config = context.config
+
+    Enum.each(Context.hosts(context), fn host ->
+      active_port = read_active_port(host, config) || config.caddy.app_port
+      say("  Starting on #{host} (port #{active_port})...", :magenta)
+      cmd = Systemd.start(config, active_port)
+
+      case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
+        {:ok, _} -> say("  Started on #{host} (port #{active_port})", :green)
+        {:error, reason} -> say("  Error on #{host}: #{inspect(reason)}", :red)
+      end
+    end)
+  end
+
+  @doc """
+  Prints the current release version on the selected hosts.
+
+  See also `mix xamal.versions`, which lists every release and marks the current one.
+  """
+  def version(_args, _opts, context) do
+    config = context.config
+
+    Enum.each(Context.hosts(context), fn host ->
+      case SSH.execute_command(host, AppCommand.current_version(config), ssh_config: config.ssh) do
+        {:ok, output} -> puts_by_host(host, String.trim(output), type: "Version")
+        {:error, _} -> puts_by_host(host, "(unknown)", type: "Version")
+      end
+    end)
+  end
+
+  @doc """
+  Lists releases that would be removed by pruning (a read-only preview).
+
+  `mix xamal.prune` performs the actual removal.
+  """
+  def stale_releases(_args, _opts, context) do
+    config = context.config
+    keep = Configuration.retain_releases(config)
+
+    Enum.each(Context.hosts(context), fn host ->
+      cmd = AppCommand.stale_releases(config, keep)
+
+      case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
+        {:ok, output} -> puts_by_host(host, output, type: "Stale Releases")
+        {:error, _} -> puts_by_host(host, "(none)", type: "Stale Releases")
+      end
+    end)
+  end
+
+  @doc """
+  Opens an interactive remote shell (IEx) connected to the running release.
+
+  Convenience wrapper for `mix xamal.app.exec -i`.
+  """
+  def shell(_args, opts, context) do
+    exec(["-i"], opts, context)
+  end
+
+  @doc """
+  Opens an interactive remote IEx session connected to the running release.
+
+  Alias of `shell/3`; both connect via the release's `remote` command.
+  """
+  def iex(_args, opts, context) do
+    exec(["-i"], opts, context)
+  end
+
+  @doc """
+  Runs the release migrator on the selected hosts.
+
+  Calls `<AppModule>.Release.migrate()` via the release's RPC, following the
+  conventional `mix phx.gen.release`-style `Release` module. Override the module
+  by passing it as an argument, e.g. `mix xamal.migrate MyApp.Release`.
+  """
+  def migrate(args, opts, context) do
+    module = migrate_module(args, context.config)
+    exec(["#{module}.migrate()"], opts, context)
+  end
+
+  defp migrate_module([module | _], _config) when is_binary(module) and module != "" do
+    String.trim_trailing(module, ".migrate()")
+  end
+
+  defp migrate_module(_args, config) do
+    "#{Utils.to_module_name(config.release.name)}.Release"
   end
 
   def live(_args, opts, context) do

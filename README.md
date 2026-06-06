@@ -113,6 +113,7 @@ mix xamal.setup               # Bootstrap servers and deploy
 mix xamal.deploy              # Build, distribute, and boot
 mix xamal.redeploy            # Deploy without bootstrapping
 mix xamal.rollback VERSION    # Roll back to a previous version
+mix xamal.prune               # Remove old releases, keeping the retained count
 mix xamal.remove              # Remove remote release and proxy resources
 ```
 
@@ -120,11 +121,26 @@ mix xamal.remove              # Remove remote release and proxy resources
 
 ```
 mix xamal.app.boot            # Zero-downtime restart
+mix xamal.app.start           # Start the service on its active port (no swap)
+mix xamal.app.stop            # Stop application services
 mix xamal.app.exec CMD        # Run a command in the release context
 mix xamal.app.logs -f         # Tail application logs
+mix xamal.app.version         # Show the current deployed version per host
+mix xamal.app.stale_releases  # Preview releases that pruning would remove
 mix xamal.app.maintenance     # Enable maintenance mode (503)
 mix xamal.app.live            # Disable maintenance mode
-mix xamal.app.stop            # Stop application services
+mix xamal.shell               # Open a remote shell on the running release
+mix xamal.iex                 # Open a remote IEx session
+mix xamal.migrate             # Run the release migrator (<App>.Release.migrate)
+```
+
+### Inspect
+
+```
+mix xamal.versions            # List release versions on servers
+mix xamal.details             # Show app and proxy status
+mix xamal.audit               # Show the audit log
+mix xamal.version             # Print the installed Xamal version
 ```
 
 ### Build, server, and lock
@@ -136,6 +152,7 @@ mix xamal.build.pull          # Upload release tarball
 mix xamal.build.details       # Print build configuration
 mix xamal.server.bootstrap    # Bootstrap target servers
 mix xamal.server.exec CMD     # Run a shell command on servers
+mix xamal.server.logs         # Show Caddy/proxy logs from servers
 mix xamal.lock.status         # Check deploy lock
 mix xamal.lock.acquire        # Acquire deploy lock
 mix xamal.lock.release        # Release deploy lock
