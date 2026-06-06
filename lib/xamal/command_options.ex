@@ -1,8 +1,6 @@
 defmodule Xamal.CommandOptions do
   @moduledoc false
 
-  require Logger
-
   alias Xamal.{Configuration, Context}
 
   def build_context(config, opts) do

@@ -33,13 +33,14 @@ jobs:
 
       # The Dialyzer PLT is pinned to _build/dev/dialyxir_plt.plt in mix.exs,
       # cached separately so it survives mix.lock changes that don't touch it.
+      # Keyed on the Elixir/OTP version too — a PLT is invalid across OTP versions.
       - name: Restore Dialyzer PLT cache
         uses: actions/cache@v4
         with:
           path: _build/dev/dialyxir_plt.plt
-          key: ${{ runner.os }}-plt-${{ hashFiles('mix.lock') }}
+          key: ${{ runner.os }}-plt-elixir1.20-otp28-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-plt-
+            ${{ runner.os }}-plt-elixir1.20-otp28-
 
       - run: mix deps.get
 
