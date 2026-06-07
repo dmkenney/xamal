@@ -228,11 +228,17 @@ defmodule Xamal.AppTasks do
 
   defp maybe_wait_before_batch(_index, _wait), do: :ok
 
-  # `-i`/`--interactive` may lead; everything after it is the command verbatim,
-  # so a command that itself contains dashed tokens keeps them intact.
-  defp parse_exec(["-i" | rest]), do: {[interactive: true], Enum.join(rest, " ")}
-  defp parse_exec(["--interactive" | rest]), do: {[interactive: true], Enum.join(rest, " ")}
-  defp parse_exec(args), do: {[], Enum.join(args, " ")}
+  @doc """
+  Splits exec args into `{exec_opts, command}`.
+
+  `-i`/`--interactive` may lead; everything after it is the command verbatim, so
+  a command that itself contains dashed tokens keeps them intact. Public for
+  testing; not part of the API.
+  """
+  @spec parse_exec(list(String.t())) :: {keyword(), String.t()}
+  def parse_exec(["-i" | rest]), do: {[interactive: true], Enum.join(rest, " ")}
+  def parse_exec(["--interactive" | rest]), do: {[interactive: true], Enum.join(rest, " ")}
+  def parse_exec(args), do: {[], Enum.join(args, " ")}
 
   defp interactive_exec(host, config, command) do
     active_port = read_active_port(host, config)
