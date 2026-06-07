@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1]
+
+### Fixed
+
+- Per-task flags are no longer rejected when they lead the arguments. Commands
+  like `mix xamal.app.logs -f` (and `-n`, `--since`, `--grep`) failed with
+  `Unknown option`; the global option parser now forwards unrecognized flags to
+  the task instead of raising.
+- Remote commands keep their own flags. `mix xamal.server.exec df -h /` no
+  longer has `-h /` consumed as the global `--hosts` option; option scanning
+  stops at the first positional argument.
+- `mix xamal.app.exec` no longer drops command flags other than `-i`.
+- Interactive SSH sessions (`mix xamal.app.exec -i`, `mix xamal.iex`) resolve
+  the real terminal device instead of assuming `/dev/tty` is openable, so they
+  work when the BEAM runs without a controlling terminal.
+- `mix xamal.rollback` no longer prints its "no previous version" error twice.
+
+### Added
+
+- `--skip-push` deploy option to distribute an already-built release instead of
+  rebuilding.
+
+### Removed
+
+- `mix xamal.shell`. It mirrored Kamal's `shell` (a bash session inside the
+  running container), but Xamal deploys native releases on the host, so it only
+  duplicated `mix xamal.iex`. Use `mix xamal.iex` for a remote console or
+  `mix xamal.server.exec` for host commands.
+
 ## [0.3.0]
 
 See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
@@ -49,6 +78,7 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.3.1]: https://github.com/dmkenney/xamal/releases/tag/v0.3.1
 [0.3.0]: https://github.com/dmkenney/xamal/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dmkenney/xamal/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dmkenney/xamal/releases/tag/v0.1.0
