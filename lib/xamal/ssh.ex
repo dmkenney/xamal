@@ -180,129 +180,67 @@ defmodule Xamal.SSH do
     exec_result = :ssh_connection.exec(conn, channel, String.to_charlist(command), 30_000)
     true = exec_result == :success
 
-    # The BEAM is often started without a controlling terminal (e.g. via the
-    # `mix`/`elixir` launchers), so `/dev/tty` is unopenable even when our
-    # stdio is a real pts. Resolve the actual terminal device from our fds and
-    # operate on that. If no terminal can be found, skip raw mode rather than
-    # crashing — the session still works, just without local line discipline.
-    tty = tty_device()
-    old_stty = tty && stty(tty, ["-g"])
-    if old_stty, do: stty(tty, ["raw", "-echo"])
-
-    # Steal fd 0 for raw keystroke reading. Uses fd 2 (stderr) as the port output fd
-    # so we don't steal fd 1 from prim_tty — IO.write still works for channel output.
-    #
-    # Taking fd 0 from prim_tty (the local terminal driver) makes erts emit a
-    # "driver ... stealing control of fd=0 from resource prim_tty:tty" error.
-    # The takeover is intentional and harmless, so suppress just that one
-    # emulator message for the lifetime of the port.
-    suppress_fd_steal_log()
-    stdin_port = Port.open({:fd, 0, 2}, [:binary, :eof])
+    {:ok, tty} = Xamal.TTY.start_link(owner: self())
 
     try do
-      interactive_channel_loop(conn, channel, stdin_port)
+      interactive_channel_loop(conn, channel, tty)
     after
-      try do
-        Port.close(stdin_port)
-      catch
-        _, _ -> :ok
-      end
-
-      restore_fd_steal_log()
-      if old_stty, do: stty(tty, [String.trim(old_stty)])
+      Xamal.TTY.close(tty)
     end
   end
 
-  @fd_steal_filter :xamal_fd_steal
-
-  # Install a logger filter that drops the single erts emulator message emitted
-  # when our port takes over fd 0 from prim_tty. Scoped to the interactive
-  # session and removed afterwards so no other logging is affected.
-  defp suppress_fd_steal_log do
-    :logger.add_primary_filter(@fd_steal_filter, {&fd_steal_filter/2, :ok})
-  catch
-    # Already installed (e.g. nested session) — fine, leave it in place.
-    _, _ -> :ok
-  end
-
-  defp restore_fd_steal_log do
-    :logger.remove_primary_filter(@fd_steal_filter)
-  catch
-    _, _ -> :ok
-  end
-
-  defp fd_steal_filter(%{meta: %{error_logger: %{emulator: true}}, msg: {_fmt, [chars]}}, _extra) do
-    text = :unicode.characters_to_binary(chars)
-
-    if is_binary(text) and :binary.match(text, "stealing control of fd") != :nomatch do
-      :stop
-    else
-      :ignore
-    end
-  rescue
-    _ -> :ignore
-  end
-
-  defp fd_steal_filter(_event, _extra), do: :ignore
-
-  # Locate the terminal device backing our stdio. Prefer the real device behind
-  # our file descriptors (works without a controlling terminal); fall back to
-  # /dev/tty for platforms without /proc. Returns nil if none is a tty.
-  defp tty_device do
-    pid = System.pid()
-
-    fd_device =
-      Enum.find_value([0, 1, 2], fn fd ->
-        case File.read_link("/proc/#{pid}/fd/#{fd}") do
-          {:ok, path} -> tty?(path) && path
-          _ -> nil
-        end
-      end)
-
-    cond do
-      fd_device -> fd_device
-      tty?("/dev/tty") -> "/dev/tty"
-      true -> nil
-    end
-  end
-
-  # A device is usable as a terminal if `stty -g` against it succeeds.
-  defp tty?(device) do
-    match?({_, 0}, System.cmd("stty", ["-F", device, "-g"], stderr_to_stdout: true))
-  rescue
-    _ -> false
-  end
-
-  defp stty(device, args) do
-    case System.cmd("stty", ["-F", device | args], stderr_to_stdout: true) do
-      {output, 0} -> output
-      _ -> nil
-    end
-  end
-
-  defp interactive_channel_loop(conn, channel, stdin_port) do
+  defp interactive_channel_loop(conn, channel, tty) do
     receive do
-      {^stdin_port, {:data, data}} ->
-        :ssh_connection.send(conn, channel, data)
-        interactive_channel_loop(conn, channel, stdin_port)
+      message ->
+        case Xamal.TTY.unwrap_message(tty, message) do
+          {:data, data} ->
+            :ssh_connection.send(conn, channel, data)
+            interactive_channel_loop(conn, channel, tty)
 
-      {^stdin_port, :eof} ->
-        :ssh_connection.send_eof(conn, channel)
-        interactive_channel_loop(conn, channel, stdin_port)
+          :eof ->
+            :ssh_connection.send_eof(conn, channel)
+            interactive_channel_loop(conn, channel, tty)
 
-      {:ssh_cm, ^conn, {:data, ^channel, _type, data}} ->
-        IO.write(data)
-        interactive_channel_loop(conn, channel, stdin_port)
-
-      {:ssh_cm, ^conn, {:eof, ^channel}} ->
-        interactive_channel_loop(conn, channel, stdin_port)
-
-      {:ssh_cm, ^conn, {:exit_status, ^channel, _status}} ->
-        interactive_channel_loop(conn, channel, stdin_port)
-
-      {:ssh_cm, ^conn, {:closed, ^channel}} ->
-        :ok
+          :unknown ->
+            handle_interactive_channel_message(conn, channel, tty, message)
+        end
     end
+  end
+
+  defp handle_interactive_channel_message(
+         conn,
+         channel,
+         tty,
+         {:ssh_cm, conn, {:data, channel, _type, data}}
+       ) do
+    IO.write(data)
+    interactive_channel_loop(conn, channel, tty)
+  end
+
+  defp handle_interactive_channel_message(conn, channel, tty, {:ssh_cm, conn, {:eof, channel}}) do
+    interactive_channel_loop(conn, channel, tty)
+  end
+
+  defp handle_interactive_channel_message(
+         conn,
+         channel,
+         tty,
+         {:ssh_cm, conn, {:exit_status, channel, _status}}
+       ) do
+    interactive_channel_loop(conn, channel, tty)
+  end
+
+  defp handle_interactive_channel_message(
+         conn,
+         channel,
+         _tty,
+         {:ssh_cm, conn, {:closed, channel}}
+       ) do
+    :ok
+  end
+
+  defp handle_interactive_channel_message(conn, channel, tty, _message) do
+    interactive_channel_loop(conn, channel, tty)
   end
 
   defp do_streaming_exec(conn, command, timeout) do
