@@ -16,6 +16,22 @@ defmodule Xamal.MixTaskIntegration.FeaturesTest do
     assert output =~ "Service: test-app"
   end
 
+  test "a leading boolean global flag is accepted, not rejected", %{dir: dir} do
+    setup_config(dir)
+    # Regression guard: the global parser used to raise "Unknown option" on any
+    # leading flag, breaking commands like `mix xamal.app.logs -f`.
+    {output, 0} = xamal(["config", "-v"], dir)
+    assert output =~ "Service: test-app"
+    refute output =~ "Unknown option"
+  end
+
+  test "globals are parsed when mixed with other leading flags", %{dir: dir} do
+    setup_config(dir)
+    {output, 0} = xamal(["config", "-v", "-c", "config/xamal.exs"], dir)
+    assert output =~ "Service: test-app"
+    refute output =~ "Unknown option"
+  end
+
   # -- Destinations --
 
   test "destination file overrides base config", %{dir: dir} do
