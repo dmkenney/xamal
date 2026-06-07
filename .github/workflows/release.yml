@@ -36,7 +36,6 @@ jobs:
         run: mix hex.publish --yes
 
       - name: Extract changelog section
-        id: changelog
         run: |
           version="${GITHUB_REF_NAME#v}"
           # Pull the body between this version's heading and the next "## [" heading.
@@ -47,15 +46,14 @@ jobs:
           ' CHANGELOG.md)"
           # Trim leading/trailing blank lines.
           notes="$(printf '%s\n' "$notes" | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac)"
-          {
-            echo "notes<<EOF"
-            if [ -n "$notes" ]; then
-              echo "$notes"
-            else
-              echo "Release $GITHUB_REF_NAME"
-            fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          # Write to a file rather than a step output: passing the body via
+          # --notes-file keeps backticks/$()/$VAR in the changelog from being
+          # interpreted by the shell that runs the next step.
+          if [ -n "$notes" ]; then
+            printf '%s\n' "$notes" > release_notes.md
+          else
+            printf '%s\n' "Release $GITHUB_REF_NAME" > release_notes.md
+          fi
 
       - name: Create GitHub Release
         env:
@@ -63,4 +61,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
-            --notes "${{ steps.changelog.outputs.notes }}"
+            --notes-file release_notes.md
