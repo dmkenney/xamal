@@ -88,9 +88,6 @@ defmodule Xamal.Deployment do
   def rollback([], opts, context) do
     case previous_version(context) do
       nil ->
-        IO.puts(:stderr, "No previous version found to roll back to.")
-        IO.puts(:stderr, "Usage: mix xamal.rollback [VERSION]")
-
         Mix.raise(
           "No previous version found to roll back to. Usage: mix xamal.rollback [VERSION]"
         )
