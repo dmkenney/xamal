@@ -157,7 +157,6 @@ mix xamal.app.version         # Show the current deployed version per host
 mix xamal.app.stale_releases  # Preview releases that pruning would remove
 mix xamal.app.maintenance     # Enable maintenance mode (503)
 mix xamal.app.live            # Disable maintenance mode
-mix xamal.shell               # Open a remote shell on the running release
 mix xamal.iex                 # Open a remote IEx session
 mix xamal.migrate             # Run the release migrator (<App>.Release.migrate)
 ```

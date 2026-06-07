@@ -146,18 +146,10 @@ defmodule Xamal.AppTasks do
   end
 
   @doc """
-  Opens an interactive remote shell (IEx) connected to the running release.
-
-  Convenience wrapper for `mix xamal.app.exec -i`.
-  """
-  def shell(_args, opts, context) do
-    exec(["-i"], opts, context)
-  end
-
-  @doc """
   Opens an interactive remote IEx session connected to the running release.
 
-  Alias of `shell/3`; both connect via the release's `remote` command.
+  Convenience wrapper for `mix xamal.app.exec -i`, connecting via the release's
+  `remote` command.
   """
   def iex(_args, opts, context) do
     exec(["-i"], opts, context)
