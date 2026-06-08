@@ -118,20 +118,6 @@ defmodule Xamal.Commands.Builder do
   end
 
   @doc """
-  SCP command to upload tarball to a host.
-  """
-  def scp_tarball(config, host, ssh_config) do
-    local_tarball = tarball_path(config)
-    version = config.version
-    remote_dir = "#{Configuration.releases_directory(config)}/#{version}"
-    remote_path = "#{remote_dir}/#{tarball_name(config)}"
-
-    port_arg = if ssh_config.port != 22, do: "-P #{ssh_config.port}", else: ""
-
-    "scp #{port_arg} #{local_tarball} #{ssh_config.user}@#{host}:#{remote_path}"
-  end
-
-  @doc """
   Unpack the tarball on the remote host.
   """
   def unpack_tarball(config) do

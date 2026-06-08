@@ -76,13 +76,40 @@ defmodule Xamal.SSH do
   end
 
   @doc """
-  Upload a file to a remote host via SCP (using SFTP channel).
+  Upload a file to a remote host.
+
+  When an on-disk private key is configured (`ssh.keys`), this shells out to the
+  system `scp` binary, which transfers at full link speed. Erlang's built-in
+  `:ssh_sftp` writes the whole file through a small SFTP window (~100-200 KB/s in
+  practice), which is pathologically slow for release tarballs (hundreds of MB) —
+  a multi-minute upload becomes seconds over scp. When no key file is available
+  (e.g. `key_data` from a secrets manager, or an agent), it falls back to the
+  in-VM SFTP channel so those flows keep working.
   """
   def upload(host, local_path, remote_path, opts \\ []) do
     ssh_config = Keyword.get(opts, :ssh_config, %Ssh{})
     hostname = Host.hostname(host)
     port = Host.port(host, ssh_config)
 
+    # Use scp only when both an on-disk key and the scp binary are available.
+    # A missing scp binary falls back to SFTP instead of raising :enoent, so
+    # the upload still succeeds (just slower) and the contract is preserved.
+    case key_file(ssh_config) do
+      {:ok, key_path} ->
+        if scp_available?() do
+          upload_via_scp(key_path, ssh_config.user, hostname, port, local_path, remote_path)
+        else
+          upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path)
+        end
+
+      :none ->
+        upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path)
+    end
+  end
+
+  defp scp_available?, do: System.find_executable("scp") != nil
+
+  defp upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path) do
     checkout_result =
       try do
         ConnectionPool.checkout(
@@ -102,6 +129,53 @@ defmodule Xamal.SSH do
       after
         ConnectionPool.checkin(hostname, port, ssh_config.user)
       end
+    end
+  end
+
+  @doc """
+  Resolve the first existing on-disk private key from `ssh.keys`.
+
+  Returns `{:ok, expanded_path}` when a configured key exists on disk, or
+  `:none` for `key_data`/agent flows (no usable file). This selection is what
+  decides whether `upload/4` uses scp or falls back to the in-VM SFTP channel.
+  """
+  def key_file(%{keys: keys}) when is_list(keys) do
+    Enum.find_value(keys, :none, fn k ->
+      expanded = Path.expand(k)
+      if File.exists?(expanded), do: {:ok, expanded}, else: false
+    end)
+  end
+
+  def key_file(_), do: :none
+
+  @doc """
+  Build the argument list passed to the `scp` binary.
+
+  Uses an arg list (not a shell string) to avoid the shell, and carries the
+  non-interactive deploy flags `BatchMode=yes` and
+  `StrictHostKeyChecking=accept-new`.
+  """
+  def scp_args(key_path, user, hostname, port, local_path, remote_path) do
+    [
+      "-i",
+      key_path,
+      "-P",
+      to_string(port),
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      local_path,
+      "#{user}@#{hostname}:#{remote_path}"
+    ]
+  end
+
+  defp upload_via_scp(key_path, user, hostname, port, local_path, remote_path) do
+    args = scp_args(key_path, user, hostname, port, local_path, remote_path)
+
+    case System.cmd("scp", args, stderr_to_stdout: true) do
+      {_, 0} -> {:ok, remote_path}
+      {output, code} -> {:error, {:scp_failed, code, String.trim(output)}}
     end
   end
 
