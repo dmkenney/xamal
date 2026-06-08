@@ -16,12 +16,12 @@ defmodule Xamal.BuildTasks do
   def deliver(_args, opts, context) do
     skip_hooks = Keyword.get(opts, :skip_hooks, false)
     run_hook("pre-build", [skip_hooks: skip_hooks], context)
-    push([], opts, context)
+    build([], opts, context)
     run_hook("post-build", [skip_hooks: skip_hooks], context)
-    pull([], opts, context)
+    upload([], opts, context)
   end
 
-  def push(_args, _opts, context) do
+  def build(_args, _opts, context) do
     config = context.config
     docker? = BuildConfig.docker?(config.builder)
 
@@ -107,14 +107,14 @@ defmodule Xamal.BuildTasks do
               __STACKTRACE__
   end
 
-  def pull(_args, _opts, context) do
+  def upload(_args, _opts, context) do
     config = context.config
     hosts = Context.hosts(context)
 
     tarball_path = Builder.tarball_path(config)
 
     unless File.exists?(tarball_path) do
-      raise "Tarball not found at #{tarball_path}. Run 'mix xamal.build.push' first."
+      raise "Tarball not found at #{tarball_path}. Run 'mix xamal.build' first."
     end
 
     Enum.each(hosts, fn host ->

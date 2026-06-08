@@ -6,6 +6,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0]
+
+### Changed
+
+- **Renamed the build tasks** away from the registry-derived `push`/`pull`
+  verbs, which were misleading for a tarball-over-SSH workflow (nothing is
+  pushed to a registry, and "pull" actually uploaded to the server):
+  - `mix xamal.build.push` → `mix xamal.build` (build the tarball locally)
+  - `mix xamal.build.pull` → `mix xamal.build.upload` (upload the tarball to servers)
+  - `mix xamal.build.deliver` and `mix xamal.build.details` are unchanged.
+  - The `--skip-push` deploy option is renamed to `--skip-build` (it skips the
+    build and uploads an existing tarball). These are hard renames with no
+    deprecation aliases.
+
 ### Added
 
 - `CONTRIBUTING.md` documenting the development workflow, the `## [Unreleased]`
@@ -103,6 +117,7 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.4.0]: https://github.com/dmkenney/xamal/releases/tag/v0.4.0
 [0.3.2]: https://github.com/dmkenney/xamal/releases/tag/v0.3.2
 [0.3.1]: https://github.com/dmkenney/xamal/releases/tag/v0.3.1
 [0.3.0]: https://github.com/dmkenney/xamal/releases/tag/v0.3.0
