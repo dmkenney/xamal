@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2]
+
+### Changed
+
+- Release tarballs now upload via the system `scp` binary when an on-disk SSH
+  key (`ssh.keys`) is configured, instead of Erlang's SFTP channel. SFTP's small
+  window made large transfers slow (observed ~9 min for a ~120 MB tarball); scp
+  runs at full link speed. Flows without an on-disk key (`key_data` from a
+  secrets manager, or an SSH agent) continue to use the in-VM SFTP channel, as
+  does the fallback when no `scp` binary is present.
+
+### Fixed
+
+- The release workflow no longer fails when a changelog entry contains
+  backticks or `$()`. Release notes are now passed to `gh release create` via
+  `--notes-file` instead of being interpolated into the command, so shell
+  metacharacters in the notes are not executed.
+
 ## [0.3.1]
 
 ### Fixed
@@ -78,6 +96,7 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.3.2]: https://github.com/dmkenney/xamal/releases/tag/v0.3.2
 [0.3.1]: https://github.com/dmkenney/xamal/releases/tag/v0.3.1
 [0.3.0]: https://github.com/dmkenney/xamal/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dmkenney/xamal/releases/tag/v0.2.0
