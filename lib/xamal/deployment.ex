@@ -153,9 +153,9 @@ defmodule Xamal.Deployment do
   end
 
   defp distribute_release(opts, context) do
-    if Keyword.get(opts, :skip_push, false) do
+    if Keyword.get(opts, :skip_build, false) do
       say("Distributing release to servers...", :magenta)
-      BuildTasks.pull([], opts, context)
+      BuildTasks.upload([], opts, context)
     else
       say("Building and distributing release...", :magenta)
       BuildTasks.deliver([], opts, context)
