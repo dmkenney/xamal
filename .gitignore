@@ -9,4 +9,8 @@ erl_crash.dump
 /tmp/
 .elixir_ls/
 .envrc
-.claude/
+# Ignore local Claude state (lock files, transcripts, local settings),
+# but track shared project skills.
+.claude/*
+!.claude/skills/
+.claude/settings.local.json

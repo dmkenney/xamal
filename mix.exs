@@ -36,7 +36,7 @@ defmodule Xamal.MixProject do
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md"
       },
-      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md UPGRADING.md)
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md UPGRADING.md)
     ]
   end
 
