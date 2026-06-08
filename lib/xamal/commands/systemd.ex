@@ -9,6 +9,7 @@ defmodule Xamal.Commands.Systemd do
 
   import Xamal.Commands.Base
 
+  alias Systemd.UnitFile
   alias Xamal.Configuration
   alias Xamal.Configuration.{Caddy, Role}
 
@@ -23,26 +24,29 @@ defmodule Xamal.Commands.Systemd do
     user = config.ssh.user
     drain_timeout = Configuration.drain_timeout(config)
 
-    """
-    [Unit]
-    Description=#{release_name} (%i)
-    After=network.target
+    unit_file =
+      UnitFile.service(
+        unit: [
+          description: "#{release_name} (%i)",
+          after: "network.target"
+        ],
+        service: [
+          type: :exec,
+          user: user,
+          working_directory: "#{service_dir}/current",
+          environment_file: "-#{service_dir}/env/app.env",
+          environment: ["PORT=%i", "RELEASE_NODE=#{release_name}_%i"],
+          exec_start: "#{service_dir}/current/bin/#{release_name} start",
+          restart: "on-failure",
+          restart_sec: 5,
+          timeout_stop_sec: drain_timeout
+        ],
+        install: [wanted_by: "multi-user.target"]
+      )
 
-    [Service]
-    Type=exec
-    User=#{user}
-    WorkingDirectory=#{service_dir}/current
-    EnvironmentFile=-#{service_dir}/env/app.env
-    Environment=PORT=%i
-    Environment=RELEASE_NODE=#{release_name}_%i
-    ExecStart=#{service_dir}/current/bin/#{release_name} start
-    Restart=on-failure
-    RestartSec=5
-    TimeoutStopSec=#{drain_timeout}
+    :ok = UnitFile.validate(unit_file, :service)
 
-    [Install]
-    WantedBy=multi-user.target
-    """
+    UnitFile.to_string(unit_file)
   end
 
   @doc """
