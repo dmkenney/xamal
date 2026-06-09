@@ -25,4 +25,30 @@ defmodule Xamal.TTYTest do
     assert {:error, message} = TTY.start_link(backend: :missing)
     assert message =~ "invalid TTY backend"
   end
+
+  test "closes OTP raw reader and restores cooked mode without exiting caller" do
+    parent = self()
+
+    reader =
+      spawn(fn ->
+        receive do
+          :stop -> :ok
+        end
+      end)
+
+    monitor = Process.monitor(reader)
+
+    tty = %TTY{
+      backend: {:otp_raw, reader},
+      mode_fun: fn mode ->
+        send(parent, {:terminal_mode, mode})
+        :ok
+      end
+    }
+
+    assert :ok = TTY.close(tty)
+    assert_receive {:terminal_mode, :cooked}
+    assert_receive {:DOWN, ^monitor, :process, ^reader, :shutdown}
+    refute_receive {:EXIT, ^reader, :shutdown}
+  end
 end

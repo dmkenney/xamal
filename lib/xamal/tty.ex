@@ -3,7 +3,7 @@ defmodule Xamal.TTY do
 
   @reader_ref {:xamal_tty, :reader}
 
-  defstruct [:backend]
+  defstruct [:backend, :mode_fun]
 
   @type backend :: :auto | :otp_raw | :fd_port
   @type event :: {:data, binary()} | :eof
@@ -24,9 +24,9 @@ defmodule Xamal.TTY do
   end
 
   @spec close(t()) :: :ok
-  def close(%__MODULE__{backend: {:otp_raw, reader}}) do
+  def close(%__MODULE__{backend: {:otp_raw, reader}} = tty) do
     if Process.alive?(reader), do: Process.exit(reader, :shutdown)
-    set_otp_terminal_mode(:cooked)
+    set_terminal_mode(tty, :cooked)
   end
 
   def close(%__MODULE__{backend: {:fd_port, port, tty, old_stty}}) do
@@ -92,7 +92,7 @@ defmodule Xamal.TTY do
   defp start_backend(:otp_raw, owner) do
     :ok = set_otp_terminal_mode(:raw)
     reader = spawn(fn -> otp_raw_read_loop(owner) end)
-    {:ok, %__MODULE__{backend: {:otp_raw, reader}}}
+    {:ok, %__MODULE__{backend: {:otp_raw, reader}, mode_fun: &set_otp_terminal_mode/1}}
   end
 
   defp start_backend(:fd_port, _owner) do
@@ -102,6 +102,14 @@ defmodule Xamal.TTY do
 
     port = Port.open({:fd, 0, 2}, [:binary, :eof])
     {:ok, %__MODULE__{backend: {:fd_port, port, tty, old_stty}}}
+  end
+
+  defp set_terminal_mode(%__MODULE__{mode_fun: mode_fun}, mode) when is_function(mode_fun, 1) do
+    mode_fun.(mode)
+  end
+
+  defp set_terminal_mode(%__MODULE__{}, mode) do
+    set_otp_terminal_mode(mode)
   end
 
   defp set_otp_terminal_mode(mode) when mode in [:raw, :cooked] do
