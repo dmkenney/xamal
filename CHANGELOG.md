@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1]
+
+### Changed
+
+- Interactive SSH sessions now use OTP 28's supported raw terminal mode
+  (`:shell.start_interactive({:noshell, :raw})`) when available, instead of
+  taking over fd 0 with a port. This removes the "stealing control of fd=0"
+  path on newer OTP releases. OTP 26/27 keep the previous fd/stty approach as
+  a fallback, which now also handles macOS/BSD `stty -f`.
+
 ## [0.4.0]
 
 ### Changed
@@ -117,6 +127,7 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.4.1]: https://github.com/dmkenney/xamal/releases/tag/v0.4.1
 [0.4.0]: https://github.com/dmkenney/xamal/releases/tag/v0.4.0
 [0.3.2]: https://github.com/dmkenney/xamal/releases/tag/v0.3.2
 [0.3.1]: https://github.com/dmkenney/xamal/releases/tag/v0.3.1
