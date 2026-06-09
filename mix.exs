@@ -1,7 +1,7 @@
 defmodule Xamal.MixProject do
   use Mix.Project
 
-  @version "0.3.1"
+  @version "0.4.0"
   @source_url "https://github.com/dmkenney/xamal"
 
   def project do
@@ -36,7 +36,7 @@ defmodule Xamal.MixProject do
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md"
       },
-      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md UPGRADING.md)
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md UPGRADING.md)
     ]
   end
 

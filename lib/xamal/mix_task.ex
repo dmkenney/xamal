@@ -29,7 +29,7 @@ defmodule Xamal.MixTask do
     destination: :string,
     skip_hooks: :boolean,
     skip_dirty_check: :boolean,
-    skip_push: :boolean,
+    skip_build: :boolean,
     confirmed: :boolean
   ]
 

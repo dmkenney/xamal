@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.4.0]
+
+### Changed
+
+- **Renamed the build tasks** away from the registry-derived `push`/`pull`
+  verbs, which were misleading for a tarball-over-SSH workflow (nothing is
+  pushed to a registry, and "pull" actually uploaded to the server):
+  - `mix xamal.build.push` → `mix xamal.build` (build the tarball locally)
+  - `mix xamal.build.pull` → `mix xamal.build.upload` (upload the tarball to servers)
+  - `mix xamal.build.deliver` and `mix xamal.build.details` are unchanged.
+  - The `--skip-push` deploy option is renamed to `--skip-build` (it skips the
+    build and uploads an existing tarball). These are hard renames with no
+    deprecation aliases.
+
+### Added
+
+- `CONTRIBUTING.md` documenting the development workflow, the `## [Unreleased]`
+  changelog convention, and the maintainer release process.
+
+## [0.3.2]
+
+### Changed
+
+- Release tarballs now upload via the system `scp` binary when an on-disk SSH
+  key (`ssh.keys`) is configured, instead of Erlang's SFTP channel. SFTP's small
+  window made large transfers slow (observed ~9 min for a ~120 MB tarball); scp
+  runs at full link speed. Flows without an on-disk key (`key_data` from a
+  secrets manager, or an SSH agent) continue to use the in-VM SFTP channel, as
+  does the fallback when no `scp` binary is present.
+
+### Fixed
+
+- The release workflow no longer fails when a changelog entry contains
+  backticks or `$()`. Release notes are now passed to `gh release create` via
+  `--notes-file` instead of being interpolated into the command, so shell
+  metacharacters in the notes are not executed.
+
 ## [0.3.1]
 
 ### Fixed
@@ -78,6 +117,8 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.4.0]: https://github.com/dmkenney/xamal/releases/tag/v0.4.0
+[0.3.2]: https://github.com/dmkenney/xamal/releases/tag/v0.3.2
 [0.3.1]: https://github.com/dmkenney/xamal/releases/tag/v0.3.1
 [0.3.0]: https://github.com/dmkenney/xamal/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dmkenney/xamal/releases/tag/v0.2.0

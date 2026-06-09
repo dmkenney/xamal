@@ -1,5 +1,5 @@
-defmodule Mix.Tasks.Xamal.Build.Push do
+defmodule Mix.Tasks.Xamal.Build do
   @moduledoc "Builds the release tarball locally."
   @shortdoc "Builds release tarball"
-  use Xamal.MixTask, run: {Xamal.BuildTasks, :push}
+  use Xamal.MixTask, run: {Xamal.BuildTasks, :build}
 end

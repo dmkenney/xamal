@@ -173,9 +173,9 @@ mix xamal.version             # Print the installed Xamal version
 ### Build, server, and lock
 
 ```
+mix xamal.build               # Build release tarball
+mix xamal.build.upload        # Upload release tarball to servers
 mix xamal.build.deliver       # Build and upload release
-mix xamal.build.push          # Build release tarball
-mix xamal.build.pull          # Upload release tarball
 mix xamal.build.details       # Print build configuration
 mix xamal.server.bootstrap    # Bootstrap target servers
 mix xamal.server.exec CMD     # Run a shell command on servers

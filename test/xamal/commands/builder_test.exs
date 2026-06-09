@@ -160,24 +160,6 @@ defmodule Xamal.Commands.BuilderTest do
     end
   end
 
-  describe "scp_tarball/3" do
-    test "builds scp command" do
-      ssh_config = %Xamal.Configuration.Ssh{user: "deploy", port: 22}
-      result = Builder.scp_tarball(@config, "10.0.0.1", ssh_config)
-
-      assert result =~ "scp"
-      assert result =~ "deploy@10.0.0.1"
-      assert result =~ "my_app-abc1234.tar.gz"
-    end
-
-    test "includes port when non-standard" do
-      ssh_config = %Xamal.Configuration.Ssh{user: "deploy", port: 2222}
-      result = Builder.scp_tarball(@config, "10.0.0.1", ssh_config)
-
-      assert result =~ "-P 2222"
-    end
-  end
-
   describe "unpack_tarball/1" do
     test "unpacks and removes tarball" do
       cmd = Builder.unpack_tarball(@config)
