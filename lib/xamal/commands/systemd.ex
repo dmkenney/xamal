@@ -16,9 +16,9 @@ defmodule Xamal.Commands.Systemd do
   @unit_dir "/etc/systemd/system"
 
   @doc """
-  Generate the systemd unit file content for a template service.
+  Builds the parsed systemd unit file for a template service.
   """
-  def generate_unit_content(config) do
+  def unit_file(config) do
     release_name = config.release.name
     service_dir = Configuration.service_directory(config)
     user = config.ssh.user
@@ -46,7 +46,16 @@ defmodule Xamal.Commands.Systemd do
 
     :ok = UnitFile.validate(unit_file, :service)
 
-    UnitFile.to_string(unit_file)
+    unit_file
+  end
+
+  @doc """
+  Generate the systemd unit file content for a template service.
+  """
+  def generate_unit_content(config) do
+    config
+    |> unit_file()
+    |> UnitFile.to_string()
   end
 
   @doc """

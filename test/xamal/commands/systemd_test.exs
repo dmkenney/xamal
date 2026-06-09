@@ -1,6 +1,7 @@
 defmodule Xamal.Commands.SystemdTest do
   use ExUnit.Case, async: true
 
+  alias Systemd.UnitFile
   alias Xamal.Commands.Systemd
 
   @config %Xamal.Configuration{
@@ -46,6 +47,24 @@ defmodule Xamal.Commands.SystemdTest do
       content = Systemd.generate_unit_content(@config)
       assert content =~ "Type=exec"
     end
+  end
+
+  test "builds a valid systemdkit unit AST" do
+    unit_file = Systemd.unit_file(@config)
+
+    assert :ok = UnitFile.validate(unit_file, :service)
+
+    assert UnitFile.get_all(unit_file, "Service", "Environment") == [
+             "PORT=%i",
+             "RELEASE_NODE=my_app_%i"
+           ]
+  end
+
+  test "generated unit content round-trips through systemdkit parser" do
+    content = Systemd.generate_unit_content(@config)
+
+    assert {:ok, unit_file} = UnitFile.parse(content)
+    assert :ok = UnitFile.validate(unit_file, :service)
   end
 
   describe "install_unit/1" do
