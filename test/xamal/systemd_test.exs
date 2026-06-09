@@ -16,6 +16,6 @@ defmodule Xamal.SystemdTest do
   }
 
   test "uses the same systemd instance naming as remote commands" do
-    assert Systemd.unit_instance(@config, 4000) == "my_app@4000"
+    assert Systemd.unit_instance(@config, 4000) == "my_app@4000.service"
   end
 end

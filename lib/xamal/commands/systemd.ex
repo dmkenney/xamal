@@ -9,7 +9,7 @@ defmodule Xamal.Commands.Systemd do
 
   import Xamal.Commands.Base
 
-  alias Systemd.UnitFile
+  alias Systemd.{UnitFile, UnitName}
   alias Xamal.Configuration
   alias Xamal.Configuration.{Caddy, Role}
 
@@ -154,6 +154,6 @@ defmodule Xamal.Commands.Systemd do
   end
 
   defp unit_instance(config, port) do
-    "#{config.release.name}@#{port}"
+    UnitName.instance(config.release.name, port, :service)
   end
 end

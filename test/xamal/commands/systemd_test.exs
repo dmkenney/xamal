@@ -80,25 +80,35 @@ defmodule Xamal.Commands.SystemdTest do
 
   describe "start/2" do
     test "starts service instance on given port" do
-      assert Systemd.start(@config, 4000) == ["sudo", "systemctl", "start", "my_app@4000"]
+      assert Systemd.start(@config, 4000) == ["sudo", "systemctl", "start", "my_app@4000.service"]
     end
   end
 
   describe "stop/2" do
     test "stops service instance on given port" do
-      assert Systemd.stop(@config, 4001) == ["sudo", "systemctl", "stop", "my_app@4001"]
+      assert Systemd.stop(@config, 4001) == ["sudo", "systemctl", "stop", "my_app@4001.service"]
     end
   end
 
   describe "enable/2" do
     test "enables service instance for boot" do
-      assert Systemd.enable(@config, 4000) == ["sudo", "systemctl", "enable", "my_app@4000"]
+      assert Systemd.enable(@config, 4000) == [
+               "sudo",
+               "systemctl",
+               "enable",
+               "my_app@4000.service"
+             ]
     end
   end
 
   describe "disable/2" do
     test "disables service instance from boot" do
-      assert Systemd.disable(@config, 4001) == ["sudo", "systemctl", "disable", "my_app@4001"]
+      assert Systemd.disable(@config, 4001) == [
+               "sudo",
+               "systemctl",
+               "disable",
+               "my_app@4001.service"
+             ]
     end
   end
 
@@ -107,9 +117,9 @@ defmodule Xamal.Commands.SystemdTest do
       cmd = Systemd.stop_all(@config)
       cmd_str = Enum.join(cmd, " ")
 
-      assert cmd_str =~ "sudo systemctl stop my_app@4000"
+      assert cmd_str =~ "sudo systemctl stop my_app@4000.service"
       assert cmd_str =~ ";"
-      assert cmd_str =~ "sudo systemctl stop my_app@4001"
+      assert cmd_str =~ "sudo systemctl stop my_app@4001.service"
     end
   end
 
@@ -118,9 +128,9 @@ defmodule Xamal.Commands.SystemdTest do
       cmd = Systemd.disable_all(@config)
       cmd_str = Enum.join(cmd, " ")
 
-      assert cmd_str =~ "sudo systemctl disable my_app@4000"
+      assert cmd_str =~ "sudo systemctl disable my_app@4000.service"
       assert cmd_str =~ ";"
-      assert cmd_str =~ "sudo systemctl disable my_app@4001"
+      assert cmd_str =~ "sudo systemctl disable my_app@4001.service"
     end
   end
 

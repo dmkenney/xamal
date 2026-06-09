@@ -7,6 +7,7 @@ defmodule Xamal.Systemd do
   the same host, and keeps unit naming aligned with the remote command builder.
   """
 
+  alias Systemd.UnitName
   alias Xamal.Configuration
 
   @type systemd_result :: :ok | {:ok, term()} | {:error, Systemd.Error.t()}
@@ -16,7 +17,7 @@ defmodule Xamal.Systemd do
   """
   @spec unit_instance(Configuration.t(), integer() | String.t()) :: String.t()
   def unit_instance(config, port) do
-    "#{config.release.name}@#{port}"
+    UnitName.instance(config.release.name, port, :service)
   end
 
   @doc """
