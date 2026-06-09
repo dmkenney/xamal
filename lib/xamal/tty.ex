@@ -91,7 +91,7 @@ defmodule Xamal.TTY do
 
   defp start_backend(:otp_raw, owner) do
     :ok = set_otp_terminal_mode(:raw)
-    reader = spawn_link(fn -> otp_raw_read_loop(owner) end)
+    reader = spawn(fn -> otp_raw_read_loop(owner) end)
     {:ok, %__MODULE__{backend: {:otp_raw, reader}}}
   end
 

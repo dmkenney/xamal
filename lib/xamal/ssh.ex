@@ -180,12 +180,17 @@ defmodule Xamal.SSH do
     exec_result = :ssh_connection.exec(conn, channel, String.to_charlist(command), 30_000)
     true = exec_result == :success
 
-    {:ok, tty} = Xamal.TTY.start_link(owner: self())
+    case Xamal.TTY.start_link(owner: self()) do
+      {:ok, tty} ->
+        try do
+          interactive_channel_loop(conn, channel, tty)
+        after
+          Xamal.TTY.close(tty)
+        end
 
-    try do
-      interactive_channel_loop(conn, channel, tty)
-    after
-      Xamal.TTY.close(tty)
+      {:error, reason} ->
+        :ssh_connection.close(conn, channel)
+        {:error, {:tty, reason}}
     end
   end
 
