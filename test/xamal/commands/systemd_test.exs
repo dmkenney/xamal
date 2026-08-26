@@ -1,6 +1,7 @@
 defmodule Xamal.Commands.SystemdTest do
   use ExUnit.Case, async: true
 
+  alias Systemd.UnitFile
   alias Xamal.Commands.Systemd
 
   @config %Xamal.Configuration{
@@ -48,6 +49,24 @@ defmodule Xamal.Commands.SystemdTest do
     end
   end
 
+  test "builds a valid systemdkit unit AST" do
+    unit_file = Systemd.unit_file(@config)
+
+    assert :ok = UnitFile.validate(unit_file, :service)
+
+    assert UnitFile.get_all(unit_file, "Service", "Environment") == [
+             "PORT=%i",
+             "RELEASE_NODE=my_app_%i"
+           ]
+  end
+
+  test "generated unit content round-trips through systemdkit parser" do
+    content = Systemd.generate_unit_content(@config)
+
+    assert {:ok, unit_file} = UnitFile.parse(content)
+    assert :ok = UnitFile.validate(unit_file, :service)
+  end
+
   describe "install_unit/1" do
     test "writes unit file and reloads daemon" do
       cmd = Systemd.install_unit(@config)
@@ -61,25 +80,35 @@ defmodule Xamal.Commands.SystemdTest do
 
   describe "start/2" do
     test "starts service instance on given port" do
-      assert Systemd.start(@config, 4000) == ["sudo", "systemctl", "start", "my_app@4000"]
+      assert Systemd.start(@config, 4000) == ["sudo", "systemctl", "start", "my_app@4000.service"]
     end
   end
 
   describe "stop/2" do
     test "stops service instance on given port" do
-      assert Systemd.stop(@config, 4001) == ["sudo", "systemctl", "stop", "my_app@4001"]
+      assert Systemd.stop(@config, 4001) == ["sudo", "systemctl", "stop", "my_app@4001.service"]
     end
   end
 
   describe "enable/2" do
     test "enables service instance for boot" do
-      assert Systemd.enable(@config, 4000) == ["sudo", "systemctl", "enable", "my_app@4000"]
+      assert Systemd.enable(@config, 4000) == [
+               "sudo",
+               "systemctl",
+               "enable",
+               "my_app@4000.service"
+             ]
     end
   end
 
   describe "disable/2" do
     test "disables service instance from boot" do
-      assert Systemd.disable(@config, 4001) == ["sudo", "systemctl", "disable", "my_app@4001"]
+      assert Systemd.disable(@config, 4001) == [
+               "sudo",
+               "systemctl",
+               "disable",
+               "my_app@4001.service"
+             ]
     end
   end
 
@@ -88,9 +117,9 @@ defmodule Xamal.Commands.SystemdTest do
       cmd = Systemd.stop_all(@config)
       cmd_str = Enum.join(cmd, " ")
 
-      assert cmd_str =~ "sudo systemctl stop my_app@4000"
+      assert cmd_str =~ "sudo systemctl stop my_app@4000.service"
       assert cmd_str =~ ";"
-      assert cmd_str =~ "sudo systemctl stop my_app@4001"
+      assert cmd_str =~ "sudo systemctl stop my_app@4001.service"
     end
   end
 
@@ -99,9 +128,9 @@ defmodule Xamal.Commands.SystemdTest do
       cmd = Systemd.disable_all(@config)
       cmd_str = Enum.join(cmd, " ")
 
-      assert cmd_str =~ "sudo systemctl disable my_app@4000"
+      assert cmd_str =~ "sudo systemctl disable my_app@4000.service"
       assert cmd_str =~ ";"
-      assert cmd_str =~ "sudo systemctl disable my_app@4001"
+      assert cmd_str =~ "sudo systemctl disable my_app@4001.service"
     end
   end
 

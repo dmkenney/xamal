@@ -9,40 +9,53 @@ defmodule Xamal.Commands.Systemd do
 
   import Xamal.Commands.Base
 
+  alias Systemd.{UnitFile, UnitName}
   alias Xamal.Configuration
   alias Xamal.Configuration.{Caddy, Role}
 
   @unit_dir "/etc/systemd/system"
 
   @doc """
-  Generate the systemd unit file content for a template service.
+  Builds the parsed systemd unit file for a template service.
   """
-  def generate_unit_content(config) do
+  def unit_file(config) do
     release_name = config.release.name
     service_dir = Configuration.service_directory(config)
     user = config.ssh.user
     drain_timeout = Configuration.drain_timeout(config)
 
-    """
-    [Unit]
-    Description=#{release_name} (%i)
-    After=network.target
+    unit_file =
+      UnitFile.service(
+        unit: [
+          description: "#{release_name} (%i)",
+          after: "network.target"
+        ],
+        service: [
+          type: :exec,
+          user: user,
+          working_directory: "#{service_dir}/current",
+          environment_file: "-#{service_dir}/env/app.env",
+          environment: ["PORT=%i", "RELEASE_NODE=#{release_name}_%i"],
+          exec_start: "#{service_dir}/current/bin/#{release_name} start",
+          restart: "on-failure",
+          restart_sec: 5,
+          timeout_stop_sec: drain_timeout
+        ],
+        install: [wanted_by: "multi-user.target"]
+      )
 
-    [Service]
-    Type=exec
-    User=#{user}
-    WorkingDirectory=#{service_dir}/current
-    EnvironmentFile=-#{service_dir}/env/app.env
-    Environment=PORT=%i
-    Environment=RELEASE_NODE=#{release_name}_%i
-    ExecStart=#{service_dir}/current/bin/#{release_name} start
-    Restart=on-failure
-    RestartSec=5
-    TimeoutStopSec=#{drain_timeout}
+    :ok = UnitFile.validate(unit_file, :service)
 
-    [Install]
-    WantedBy=multi-user.target
-    """
+    unit_file
+  end
+
+  @doc """
+  Generate the systemd unit file content for a template service.
+  """
+  def generate_unit_content(config) do
+    config
+    |> unit_file()
+    |> UnitFile.to_string()
   end
 
   @doc """
@@ -141,6 +154,6 @@ defmodule Xamal.Commands.Systemd do
   end
 
   defp unit_instance(config, port) do
-    "#{config.release.name}@#{port}"
+    UnitName.instance(config.release.name, port, :service)
   end
 end

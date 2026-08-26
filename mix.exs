@@ -68,6 +68,7 @@ defmodule Xamal.MixProject do
   defp deps do
     [
       {:igniter, "~> 0.6"},
+      {:systemdkit, "~> 0.1.2"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
