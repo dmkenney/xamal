@@ -5,9 +5,10 @@ defmodule Xamal.ServerTasks do
 
   import Xamal.Logs
   import Xamal.Output
+  import Xamal.Remote, only: [read_active_port: 2]
 
   alias Xamal.Commands.{Caddy, Server, Systemd}
-  alias Xamal.{Context, SSH}
+  alias Xamal.{Configuration, Context, SSH}
 
   def exec(args, _opts, context) do
     command = Enum.join(args, " ")
@@ -57,8 +58,17 @@ defmodule Xamal.ServerTasks do
 
       SSH.execute_command(host, Systemd.install_unit(config), ssh_config: config.ssh)
 
-      # Generate initial Caddyfile
-      caddyfile_cmd = Caddy.write_caddyfile(config, config.caddy.app_port)
+      # Generate the Caddyfile against whichever port is serving right now.
+      #
+      # bootstrap is not only a first-run command: it is the only way to
+      # re-render the systemd unit after a config change (drain_timeout, user,
+      # service directory), so it gets run against live servers. Blue-green
+      # leaves the app on app_port or alt_port depending on how many deploys
+      # have landed, and writing app_port unconditionally pointed Caddy at the
+      # idle port and reloaded — an outage on every already-deployed server
+      # sitting on alt_port.
+      upstream_port = caddy_upstream_port(read_active_port(host, config), config)
+      caddyfile_cmd = Caddy.write_caddyfile(config, upstream_port)
       SSH.execute_command(host, caddyfile_cmd, ssh_config: config.ssh)
 
       # Point system Caddyfile to import service Caddyfiles (survives reboot)
@@ -69,6 +79,20 @@ defmodule Xamal.ServerTasks do
 
       say("  Bootstrapped #{host}", :green)
     end)
+  end
+
+  @doc false
+  # Which port bootstrap's Caddyfile should proxy to.
+  #
+  # A fresh server has no active_port file, so read_active_port/2 returns nil
+  # and app_port is correct. Otherwise trust the recorded port, but only if it
+  # is one of the two the blue-green swap actually uses — a truncated or
+  # hand-edited active_port file must not become a Caddy upstream.
+  def caddy_upstream_port(active_port, config) do
+    app_port = config.caddy.app_port
+    alt_port = Configuration.Caddy.alt_port(config.caddy)
+
+    if active_port in [app_port, alt_port], do: active_port, else: app_port
   end
 
   def logs(args, _opts, context) do
