@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `mix xamal.server.bootstrap` now writes the Caddyfile against the port that
+  is actually serving, instead of always using `app_port`. Bootstrap is the
+  only command that re-renders the systemd unit, so it gets run against live
+  servers; on a server whose last blue-green deploy landed on `alt_port`, it
+  previously repointed Caddy at the idle port and reloaded, causing an outage
+  until the next deploy swapped back. The recorded port is used only when it
+  is `app_port` or `alt_port`; otherwise it falls back to `app_port`.
+
 ## [0.4.1]
 
 ### Changed
