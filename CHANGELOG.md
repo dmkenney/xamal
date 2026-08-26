@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2]
+
 ### Fixed
 
 - `mix xamal.server.bootstrap` now writes the Caddyfile against the port that
