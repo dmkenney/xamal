@@ -133,6 +133,104 @@ defmodule Xamal.SSH do
   end
 
   @doc """
+  Download a file from a remote host to a local path.
+
+  The mirror image of `upload/4`, and it makes the same scp-vs-SFTP choice for
+  the same reason: release tarballs are hundreds of MB, and the in-VM SFTP
+  channel moves them at ~100-200 KB/s. Used by the `builder.remote` build to
+  fetch the tarball back from the build host.
+
+  Creates the local parent directory if it does not exist.
+  """
+  def download(host, remote_path, local_path, opts \\ []) do
+    ssh_config = Keyword.get(opts, :ssh_config, %Ssh{})
+    hostname = Host.hostname(host)
+    port = Host.port(host, ssh_config)
+
+    with :ok <- ensure_parent_directory(local_path) do
+      case scp_key_for_download(ssh_config) do
+        {:ok, key_path} ->
+          download_via_scp(key_path, ssh_config.user, hostname, port, remote_path, local_path)
+
+        :none ->
+          download_via_sftp_pooled(ssh_config, hostname, port, remote_path, local_path)
+      end
+    end
+  end
+
+  # scp is only usable with an on-disk key *and* the binary present; either
+  # missing falls back to SFTP, same as upload/4.
+  defp scp_key_for_download(ssh_config) do
+    case key_file(ssh_config) do
+      {:ok, key_path} -> if scp_available?(), do: {:ok, key_path}, else: :none
+      :none -> :none
+    end
+  end
+
+  defp ensure_parent_directory(local_path) do
+    case File.mkdir_p(Path.dirname(local_path)) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:mkdir_failed, reason}}
+    end
+  end
+
+  defp download_via_scp(key_path, user, hostname, port, remote_path, local_path) do
+    args = scp_args(key_path, user, hostname, port, local_path, remote_path, :download)
+
+    case System.cmd("scp", args, stderr_to_stdout: true) do
+      {_, 0} -> {:ok, local_path}
+      {output, code} -> {:error, {:scp_failed, code, String.trim(output)}}
+    end
+  end
+
+  defp download_via_sftp_pooled(ssh_config, hostname, port, remote_path, local_path) do
+    checkout_result =
+      try do
+        ConnectionPool.checkout(
+          hostname,
+          port,
+          ssh_config.user,
+          Ssh.connect_options(ssh_config)
+        )
+      catch
+        :exit, {:timeout, _} ->
+          {:error, {:ssh_connection_failed, hostname, port, :timeout}}
+      end
+
+    with {:ok, conn} <- checkout_result do
+      try do
+        download_via_sftp(conn, remote_path, local_path)
+      after
+        ConnectionPool.checkin(hostname, port, ssh_config.user)
+      end
+    end
+  end
+
+  defp download_via_sftp(conn, remote_path, local_path) do
+    {:ok, sftp} = :ssh_sftp.start_channel(conn)
+
+    try do
+      case :ssh_sftp.read_file(sftp, String.to_charlist(sftp_path(remote_path))) do
+        {:ok, content} ->
+          File.write!(local_path, content)
+          {:ok, local_path}
+
+        {:error, reason} ->
+          {:error, {:sftp_read_failed, remote_path, reason}}
+      end
+    after
+      :ssh_sftp.stop_channel(sftp)
+    end
+  end
+
+  @doc """
+  Adapt a remote path for SFTP. SFTP does not expand `~`, but it resolves
+  relative paths against the login user's home, so `~/x` becomes `x`.
+  """
+  def sftp_path("~/" <> rest), do: rest
+  def sftp_path(path), do: path
+
+  @doc """
   Resolve the first existing on-disk private key from `ssh.keys`.
 
   Returns `{:ok, expanded_path}` when a configured key exists on disk, or
@@ -149,6 +247,36 @@ defmodule Xamal.SSH do
   def key_file(_), do: :none
 
   @doc """
+  The option flags for a system `ssh` invocation, without a `user@host`
+  destination or command.
+
+  Needed because syncing source to a `builder.remote` host pipes local output
+  into a remote command (`git archive | ssh host tar -x`), which Erlang's
+  `:ssh` cannot express — that one step has to compose a real `ssh` call.
+
+  `BatchMode=yes` fails fast with a clear error instead of hanging on a
+  passphrase prompt that, invoked this way, has nowhere to be shown.
+  """
+  def ssh_flags(ssh_config, port) do
+    flags = [
+      "-p",
+      to_string(port),
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "StrictHostKeyChecking=accept-new"
+    ]
+
+    # IdentitiesOnly stops ssh offering every ssh-agent key before the -i one;
+    # an agent holding several keys trips sshd's MaxAuthTries (default 6)
+    # and disconnects with "Too many authentication failures".
+    case key_file(ssh_config) do
+      {:ok, key_path} -> ["-i", key_path] ++ flags ++ ["-o", "IdentitiesOnly=yes"]
+      :none -> flags
+    end
+  end
+
+  @doc """
   Build the argument list passed to the `scp` binary.
 
   Uses an arg list (not a shell string) to avoid the shell, and carries the
@@ -158,8 +286,8 @@ defmodule Xamal.SSH do
   sshd's MaxAuthTries (default 6) and disconnects with "Too many
   authentication failures".
   """
-  def scp_args(key_path, user, hostname, port, local_path, remote_path) do
-    [
+  def scp_args(key_path, user, hostname, port, local_path, remote_path, direction \\ :upload) do
+    flags = [
       "-i",
       key_path,
       "-P",
@@ -169,10 +297,15 @@ defmodule Xamal.SSH do
       "-o",
       "StrictHostKeyChecking=accept-new",
       "-o",
-      "IdentitiesOnly=yes",
-      local_path,
-      "#{user}@#{hostname}:#{remote_path}"
+      "IdentitiesOnly=yes"
     ]
+
+    remote = "#{user}@#{hostname}:#{remote_path}"
+
+    case direction do
+      :upload -> flags ++ [local_path, remote]
+      :download -> flags ++ [remote, local_path]
+    end
   end
 
   defp upload_via_scp(key_path, user, hostname, port, local_path, remote_path) do

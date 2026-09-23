@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `Xamal.SSH.download/4`, mirroring `upload/4` — scp when an on-disk key is
+  available, SFTP otherwise.
+
 ### Fixed
 
 - scp uploads now pass `IdentitiesOnly=yes`. Without it, an ssh-agent holding
