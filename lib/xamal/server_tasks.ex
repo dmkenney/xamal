@@ -88,6 +88,13 @@ defmodule Xamal.ServerTasks do
 
   # Each check succeeds (exit 0) only when it finds a conflict.
   defp check_host_conflicts!(host, config) do
+    case SSH.execute_command(host, Systemd.units_under_other_names(config),
+           ssh_config: config.ssh
+         ) do
+      {:ok, found} -> raise Xamal.BlueGreen.renamed_release_message(host, config, found)
+      {:error, _} -> :ok
+    end
+
     release = config.release.name
     ports = "#{config.caddy.app_port}/#{Configuration.Caddy.alt_port(config.caddy)}"
 

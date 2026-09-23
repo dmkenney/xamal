@@ -59,6 +59,45 @@ defmodule Xamal.Commands.SystemdTest do
     end
   end
 
+  describe "sync_unit/1" do
+    test "stages the unit, replaces it only when it differs, and reports the update" do
+      [sh, "-c", script] = Systemd.sync_unit(@config)
+
+      assert sh == "sh"
+      assert script =~ "sudo tee /etc/systemd/system/my_app@.service.xamal-new"
+
+      assert script =~
+               "cmp -s /etc/systemd/system/my_app@.service.xamal-new " <>
+                 "/etc/systemd/system/my_app@.service"
+
+      assert script =~ "sudo systemctl daemon-reload && echo unit-updated"
+      assert script =~ "TimeoutStopSec=30"
+    end
+
+    test "writes the same content bootstrap installs" do
+      [_, _, script] = Systemd.sync_unit(@config)
+
+      # Bootstrap's install_unit and sync_unit must render identical files, or
+      # every deploy after a bootstrap would report a spurious update.
+      content = Systemd.generate_unit_content(@config)
+      first_line = content |> String.split("\n") |> hd()
+      assert script =~ first_line
+      assert Enum.join(Systemd.install_unit(@config), " ") =~ first_line
+    end
+  end
+
+  describe "units_under_other_names/1" do
+    test "finds unit files for this service directory, minus this release's own" do
+      cmd_str = Enum.join(Systemd.units_under_other_names(@config), " ")
+
+      assert cmd_str =~
+               "grep -lxF 'WorkingDirectory=/opt/xamal/my-app/current' " <>
+                 "/etc/systemd/system/*@.service"
+
+      assert cmd_str =~ "grep -vxF /etc/systemd/system/my_app@.service"
+    end
+  end
+
   describe "start/2" do
     test "starts service instance on given port" do
       assert Systemd.start(@config, 4000) == ["sudo", "systemctl", "start", "my_app@4000"]
