@@ -37,7 +37,7 @@ Add Xamal as a Mix dependency in the application you deploy:
 # mix.exs
 defp deps do
   [
-    {:xamal, "~> 0.5", only: [:dev, :test], runtime: false}
+    {:xamal, "~> 0.6", only: [:dev, :test], runtime: false}
   ]
 end
 ```

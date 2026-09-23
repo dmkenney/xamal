@@ -1,7 +1,7 @@
 defmodule Xamal.MixProject do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.6.0"
   @source_url "https://github.com/dmkenney/xamal"
 
   def project do
