@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- scp uploads now pass `IdentitiesOnly=yes`. Without it, an ssh-agent holding
+  several keys (1Password, for example) offered them all before the configured
+  key, and sshd disconnected with "Too many authentication failures".
+
 ## [0.4.2]
 
 ### Fixed

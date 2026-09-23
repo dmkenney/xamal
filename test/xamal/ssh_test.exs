@@ -59,5 +59,11 @@ defmodule Xamal.SSHTest do
 
       assert ["-P", "22"] == Enum.slice(args, 2, 2)
     end
+
+    test "sets IdentitiesOnly so agent keys don't exhaust MaxAuthTries" do
+      args = Xamal.SSH.scp_args("/keys/id", "deploy", "host", 22, "local", "remote")
+
+      assert "IdentitiesOnly=yes" in args
+    end
   end
 end

@@ -153,7 +153,10 @@ defmodule Xamal.SSH do
 
   Uses an arg list (not a shell string) to avoid the shell, and carries the
   non-interactive deploy flags `BatchMode=yes` and
-  `StrictHostKeyChecking=accept-new`.
+  `StrictHostKeyChecking=accept-new`. `IdentitiesOnly=yes` stops scp offering
+  every ssh-agent key before the `-i` one; an agent holding several keys trips
+  sshd's MaxAuthTries (default 6) and disconnects with "Too many
+  authentication failures".
   """
   def scp_args(key_path, user, hostname, port, local_path, remote_path) do
     [
@@ -165,6 +168,8 @@ defmodule Xamal.SSH do
       "BatchMode=yes",
       "-o",
       "StrictHostKeyChecking=accept-new",
+      "-o",
+      "IdentitiesOnly=yes",
       local_path,
       "#{user}@#{hostname}:#{remote_path}"
     ]
