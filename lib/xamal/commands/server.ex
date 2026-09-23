@@ -20,8 +20,34 @@ defmodule Xamal.Commands.Server do
       make_directory(Configuration.releases_directory(config)),
       make_directory("#{Configuration.env_directory(config)}/roles"),
       make_directory(Configuration.shared_directory(config)),
-      make_directory(Configuration.run_directory())
+      make_directory(Configuration.run_directory()),
+      write([["printf", "'#{Enum.join(ports(config), "\\n")}\\n'"], [ports_path(config)]])
     ])
+  end
+
+  @doc """
+  Prints other services' `ports` files that claim either of this app's ports,
+  and succeeds (exit 0) only if there are any.
+
+  Each app records both of its blue-green ports at bootstrap. Systemd alone
+  can't answer this: the idle port's instance is stopped and unloaded between
+  deploys, so it doesn't show up, yet the next deploy will start it.
+  """
+  def claimed_port_conflicts(config) do
+    base = Configuration.base_directory()
+
+    pipe([
+      ["grep", "-lxE", "'#{Enum.join(ports(config), "|")}'", "#{base}/*/ports", "2>/dev/null"],
+      ["grep", "-vxF", ports_path(config)]
+    ])
+  end
+
+  defp ports(config) do
+    [config.caddy.app_port, Configuration.Caddy.alt_port(config.caddy)]
+  end
+
+  defp ports_path(config) do
+    "#{Configuration.service_directory(config)}/ports"
   end
 
   @doc """

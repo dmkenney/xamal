@@ -48,6 +48,27 @@ defmodule Xamal.Remote do
     SSH.execute_command(host, cmd, ssh_config: config.ssh)
   end
 
+  @doc """
+  Reload Caddy on a host, raising if the reload is rejected.
+
+  Caddy reloads the system Caddyfile, which imports every app on the host, so
+  an invalid Caddyfile from any of them fails the reload. Caddy then keeps its
+  previous config. Carrying on (e.g. stopping the old release in a blue-green
+  swap) would take the site down, so this raises instead.
+  """
+  def reload_caddy!(host, config) do
+    case ssh_exec(host, Caddy.reload(), config) do
+      {:ok, _} ->
+        :ok
+
+      {:error, {:exit_status, _, output}} ->
+        raise "Caddy rejected the reload on #{host}; the previous config is still live:\n#{output}"
+
+      {:error, reason} ->
+        raise "Caddy reload failed on #{host}: #{inspect(reason)}"
+    end
+  end
+
   defp parse_port(port_str) do
     case Integer.parse(String.trim(port_str)) do
       {port, _} -> port

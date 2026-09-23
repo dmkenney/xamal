@@ -136,6 +136,37 @@ defmodule Xamal.Commands.Systemd do
     ["ln", "-sfn", role_env, app_env]
   end
 
+  @doc """
+  Succeeds (exit 0) when the template unit for this release name already
+  exists but belongs to a different service directory — i.e. another app on
+  the host uses the same release name, and installing ours would overwrite it.
+  """
+  def unit_owned_by_other_service(config) do
+    path = unit_path(config)
+    working_dir = "WorkingDirectory=#{Configuration.service_directory(config)}/current"
+
+    combine([
+      ["test", "-f", path],
+      ["!", "grep", "-qxF", "'#{working_dir}'", path]
+    ])
+  end
+
+  @doc """
+  Prints the systemd instances bound to this app's ports that belong to a
+  different release, and succeeds (exit 0) only if there are any.
+  """
+  def port_conflicts(config) do
+    ports = [config.caddy.app_port, Caddy.alt_port(config.caddy)]
+    patterns = Enum.map(ports, &"'*@#{&1}.service'")
+    own = Enum.flat_map(ports, &["-e", "#{unit_instance(config, &1)}.service"])
+
+    pipe([
+      ["systemctl", "list-units", "--all", "--plain", "--no-legend" | patterns],
+      ["awk", "'{print $1}'"],
+      ["grep", "-vxF" | own]
+    ])
+  end
+
   defp unit_path(config) do
     "#{@unit_dir}/#{config.release.name}@.service"
   end

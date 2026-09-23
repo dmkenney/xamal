@@ -8,6 +8,9 @@ defmodule Xamal.Commands.Caddy do
   alias Xamal.Configuration
   alias Xamal.Configuration.Caddy, as: CaddyConfig
 
+  @system_caddyfile "/etc/caddy/Caddyfile"
+  @import_line "import /opt/xamal/*/Caddyfile"
+
   @doc """
   Install Caddy via apt on Debian/Ubuntu.
   """
@@ -31,7 +34,13 @@ defmodule Xamal.Commands.Caddy do
         ["sudo", "tee", "/etc/apt/sources.list.d/caddy-stable.list"]
       ]),
       ["sudo", "apt-get", "update"],
-      ["sudo", "apt-get", "install", "-y", "caddy"]
+      ["sudo", "apt-get", "install", "-y", "caddy"],
+      # The package ships a :80 welcome site. Caddy was just installed, so
+      # nothing else is in the file yet; replace it with the import line.
+      pipe([
+        ["echo", "'#{@import_line}'"],
+        ["sudo", "tee", @system_caddyfile]
+      ])
     ])
   end
 
@@ -71,28 +80,62 @@ defmodule Xamal.Commands.Caddy do
   end
 
   @doc """
-  Replace /etc/caddy/Caddyfile with an import directive so Caddy picks up
-  service Caddyfiles on reboot.
+  The host-wide Caddyfile. It imports every service's Caddyfile, which is what
+  lets several apps share one Caddy.
+  """
+  def system_caddyfile_path, do: @system_caddyfile
+
+  @doc """
+  Ensure the system Caddyfile imports the service Caddyfiles, so Caddy loads
+  every app on reload and after a reboot.
+
+  Appends the import line only if it is missing, and leaves everything else in
+  the file alone (global options, sites managed outside Xamal). If the file's
+  last line has no trailing newline, one is added first so the import line
+  isn't glued onto it.
   """
   def configure_system_caddyfile do
-    pipe([
-      ["echo", "'import /opt/xamal/*/Caddyfile'"],
-      ["sudo", "tee", "/etc/caddy/Caddyfile"]
-    ])
+    ["sudo" | shell([import_ensure_script(@system_caddyfile)])]
+  end
+
+  @doc false
+  def import_ensure_script(path) do
+    """
+    grep -qxF '#{@import_line}' #{path} 2>/dev/null || {
+      if [ -s #{path} ] && [ -n "$(tail -c1 #{path})" ]; then printf '\\n' >> #{path}; fi
+      printf '%s\\n' '#{@import_line}' >> #{path}
+    }
+    """
   end
 
   @doc """
-  Reload Caddy configuration (graceful - drains existing connections).
+  Make sure the Caddy service is enabled and running, since `reload/0` talks
+  to the running instance.
   """
-  def reload(config) do
-    ["sudo", "caddy", "reload", "--config", caddyfile_path(config)]
+  def enable do
+    ["sudo", "systemctl", "enable", "--now", "caddy"]
   end
 
   @doc """
-  Start Caddy with the service Caddyfile.
+  Reload Caddy from the system Caddyfile (graceful - drains existing
+  connections).
+
+  `caddy reload --config <file>` replaces the entire running config with what
+  that file resolves to. Reloading from a service's own Caddyfile would drop
+  every other app on the host, so this always reloads the system file, which
+  imports them all. Caddy validates the whole config first and leaves the
+  running config untouched if it is invalid.
   """
-  def start(config) do
-    ["caddy", "start", "--config", caddyfile_path(config)]
+  def reload do
+    ["sudo", "caddy", "reload", "--config", @system_caddyfile]
+  end
+
+  @doc """
+  Start Caddy with the system Caddyfile (see `reload/0` for why not the
+  service one).
+  """
+  def start do
+    ["caddy", "start", "--config", @system_caddyfile]
   end
 
   @doc """
@@ -146,6 +189,18 @@ defmodule Xamal.Commands.Caddy do
     else
       cmd
     end
+  end
+
+  @doc """
+  Prints other services' Caddyfiles that already use the `:80` catch-all site
+  (what an app with no `caddy.host` gets), and succeeds (exit 0) only if there
+  are any. Two catch-alls in the imported set make every Caddy reload fail.
+  """
+  def catch_all_conflicts(config) do
+    pipe([
+      ["grep", "-lx", "':80 {'", "#{Configuration.base_directory()}/*/Caddyfile", "2>/dev/null"],
+      ["grep", "-vxF", caddyfile_path(config)]
+    ])
   end
 
   defp caddyfile_path(config) do

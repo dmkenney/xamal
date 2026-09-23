@@ -21,6 +21,7 @@ defmodule Xamal.Remove do
         stop_app(opts, context)
         remove_systemd(config, context)
         remove_service_directory(config, context)
+        reload_proxy(config, context)
         record_audit("Remove completed", %{}, context)
         say("Removed!", :green)
       end)
@@ -41,5 +42,12 @@ defmodule Xamal.Remove do
   defp remove_service_directory(config, context) do
     say("Removing service directory...", :magenta)
     on_hosts(ServerCommand.remove_service_directory(config), context)
+  end
+
+  # The service Caddyfile is gone with the service directory; reload so the
+  # running Caddy drops this app's site and keeps serving the others.
+  defp reload_proxy(config, context) do
+    say("Reloading Caddy...", :magenta)
+    context |> Xamal.Context.hosts() |> Enum.each(&reload_caddy!(&1, config))
   end
 end

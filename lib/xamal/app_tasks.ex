@@ -82,7 +82,7 @@ defmodule Xamal.AppTasks do
     Enum.each(hosts, fn host ->
       cmd = Caddy.write_maintenance_caddyfile(config)
       SSH.execute_command(host, cmd, ssh_config: config.ssh)
-      SSH.execute_command(host, Caddy.reload(config), ssh_config: config.ssh)
+      reload_caddy!(host, config)
       say("  Maintenance mode enabled on #{host}", :green)
     end)
 
@@ -189,7 +189,7 @@ defmodule Xamal.AppTasks do
 
       cmd = Caddy.write_caddyfile(config, active_port)
       SSH.execute_command(host, cmd, ssh_config: config.ssh)
-      SSH.execute_command(host, Caddy.reload(config), ssh_config: config.ssh)
+      reload_caddy!(host, config)
       say("  Live mode restored on #{host} (port #{active_port})", :green)
     end)
 

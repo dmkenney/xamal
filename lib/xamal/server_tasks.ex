@@ -5,7 +5,7 @@ defmodule Xamal.ServerTasks do
 
   import Xamal.Logs
   import Xamal.Output
-  import Xamal.Remote, only: [read_active_port: 2]
+  import Xamal.Remote, only: [read_active_port: 2, reload_caddy!: 2]
 
   alias Xamal.Commands.{Caddy, Server, Systemd}
   alias Xamal.{Configuration, Context, SSH}
@@ -49,6 +49,10 @@ defmodule Xamal.ServerTasks do
           SSH.execute_command(host, install_cmd, ssh_config: config.ssh, timeout: 120_000)
       end
 
+      # Other apps may already live on this host; refuse before touching
+      # anything that would clobber them.
+      check_host_conflicts!(host, config)
+
       # Create directory structure
       bootstrap_cmd = Server.bootstrap(config)
       SSH.execute_command(host, bootstrap_cmd, ssh_config: config.ssh)
@@ -71,14 +75,56 @@ defmodule Xamal.ServerTasks do
       caddyfile_cmd = Caddy.write_caddyfile(config, upstream_port)
       SSH.execute_command(host, caddyfile_cmd, ssh_config: config.ssh)
 
-      # Point system Caddyfile to import service Caddyfiles (survives reboot)
+      # Make sure the system Caddyfile imports every service Caddyfile
+      # (appends the import line only if missing; nothing else is touched).
       SSH.execute_command(host, Caddy.configure_system_caddyfile(), ssh_config: config.ssh)
 
-      # Start/reload Caddy
-      SSH.execute_command(host, Caddy.reload(config), ssh_config: config.ssh)
+      SSH.execute_command(host, Caddy.enable(), ssh_config: config.ssh)
+      reload_caddy!(host, config)
 
       say("  Bootstrapped #{host}", :green)
     end)
+  end
+
+  # Each check succeeds (exit 0) only when it finds a conflict.
+  defp check_host_conflicts!(host, config) do
+    release = config.release.name
+    ports = "#{config.caddy.app_port}/#{Configuration.Caddy.alt_port(config.caddy)}"
+
+    port_message =
+      "another app on #{host} already uses ports #{ports}. Set caddy.app_port " <>
+        "so this app's two ports (app_port and app_port + 1) are free."
+
+    checks =
+      [
+        {Systemd.unit_owned_by_other_service(config),
+         "another app on #{host} already uses the release name #{inspect(release)} " <>
+           "(systemd unit #{release}@.service). Set a different release.name."},
+        # Ports recorded by other apps' bootstrap, then running units (covers
+        # apps bootstrapped before the ports file existed).
+        {Server.claimed_port_conflicts(config), port_message},
+        {Systemd.port_conflicts(config), port_message}
+      ] ++ catch_all_check(host, config)
+
+    Enum.each(checks, fn {cmd, message} ->
+      case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
+        {:ok, found} -> raise "Cannot bootstrap: #{message}\n#{found}"
+        {:error, _} -> :ok
+      end
+    end)
+  end
+
+  # Only an app with no caddy.host gets the :80 catch-all site.
+  defp catch_all_check(host, config) do
+    if Configuration.Caddy.hostnames(config.caddy) == [] do
+      [
+        {Caddy.catch_all_conflicts(config),
+         "another app on #{host} already serves every hostname on :80 (it has no " <>
+           "caddy.host). Set caddy.host for this app."}
+      ]
+    else
+      []
+    end
   end
 
   @doc false

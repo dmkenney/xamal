@@ -65,7 +65,7 @@ defmodule Xamal.BlueGreen do
   defp reload_caddy(host, config, new_port, skip_hooks, context) do
     run_hook("pre-caddy-reload", [skip_hooks: skip_hooks], context)
     ssh_exec(host, Caddy.write_caddyfile(config, new_port), config)
-    ssh_exec(host, Caddy.reload(config), config)
+    reload_caddy!(host, config)
     run_hook("post-caddy-reload", [skip_hooks: skip_hooks], context)
   end
 

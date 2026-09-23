@@ -122,6 +122,50 @@ defmodule Xamal.Commands.SystemdTest do
     end
   end
 
+  describe "unit_owned_by_other_service/1" do
+    test "checks the unit exists and points at a different service directory" do
+      cmd_str = Enum.join(Systemd.unit_owned_by_other_service(@config), " ")
+
+      assert cmd_str ==
+               "test -f /etc/systemd/system/my_app@.service && " <>
+                 "! grep -qxF 'WorkingDirectory=/opt/xamal/my-app/current' " <>
+                 "/etc/systemd/system/my_app@.service"
+    end
+  end
+
+  describe "port_conflicts/1" do
+    test "lists units on both ports, minus this release's own instances" do
+      cmd_str = Enum.join(Systemd.port_conflicts(@config), " ")
+
+      assert cmd_str =~
+               "systemctl list-units --all --plain --no-legend '*@4000.service' '*@4001.service'"
+
+      assert cmd_str =~ "grep -vxF -e my_app@4000.service -e my_app@4001.service"
+    end
+
+    test "the filter keeps only other releases' units" do
+      # Everything after the systemctl stage, fed canned list-units output.
+      filter =
+        @config
+        |> Systemd.port_conflicts()
+        |> Enum.drop_while(&(&1 != "|"))
+        |> tl()
+        |> Enum.join(" ")
+
+      input =
+        "my_app@4000.service loaded active running my_app (4000)\n" <>
+          "other@4001.service loaded active running other (4001)\n"
+
+      {out, 0} = System.cmd("sh", ["-c", "printf '#{input}' | #{filter}"])
+      assert out == "other@4001.service\n"
+
+      {_, status} =
+        System.cmd("sh", ["-c", "printf 'my_app@4000.service loaded\\n' | #{filter}"])
+
+      assert status != 0
+    end
+  end
+
   describe "write_env_symlink/2" do
     test "symlinks role env to app.env" do
       cmd = Systemd.write_env_symlink(@config, @role)
