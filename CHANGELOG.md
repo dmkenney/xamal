@@ -8,11 +8,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `builder.remote` builds the release on the configured host. Source is synced
+  with `git archive HEAD | ssh ... tar -x`, `mix release` and the tarball run
+  there, and the tarball is fetched back to the same local path a local or
+  Docker build produces, so `mix xamal.build.upload` is unchanged. Use it when
+  the build environment must match the servers (NIFs, OpenSSL, glibc) or when
+  Docker cannot produce binaries for the target OS.
 - `Xamal.SSH.download/4`, mirroring `upload/4` — scp when an on-disk key is
   available, SFTP otherwise.
 
 ### Fixed
 
+- `builder.remote` was parsed, printed by `mix xamal.build.details`, and
+  documented as working, but `mix xamal.build` ignored it and silently built
+  locally, uploading a dev-machine binary under the same name with no warning.
 - scp uploads now pass `IdentitiesOnly=yes`. Without it, an ssh-agent holding
   several keys (1Password, for example) offered them all before the configured
   key, and sshd disconnected with "Too many authentication failures".

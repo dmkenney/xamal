@@ -239,7 +239,13 @@ defmodule Xamal.Docs do
 
     The default local builder runs `mix release` on your dev machine.
     Use Docker mode when your dev OS differs from the server OS.
-    Remote mode builds on a dedicated build server via SSH.
+
+    Remote mode builds on another host over SSH. Source is synced there with
+    `git archive HEAD`, so only committed code is built - uncommitted changes
+    are not sent. The build host needs Elixir and OTP installed, at versions
+    matching the target servers. Use it when the build environment must match
+    production exactly (NIFs, OpenSSL, glibc) or when Docker cannot produce
+    binaries for the target OS.
     """)
   end
 
