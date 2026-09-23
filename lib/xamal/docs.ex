@@ -140,6 +140,25 @@ defmodule Xamal.Docs do
     for zero-downtime blue-green deployments.
 
     The generated Caddyfile lives at /opt/xamal/<service>/Caddyfile.
+    /etc/caddy/Caddyfile imports every service's Caddyfile; bootstrap adds
+    that import line if it is missing and leaves the rest of the file alone.
+
+    ## Multiple apps on one host
+
+    Several apps can share a host and its Caddy. Each needs its own:
+
+      service        # directory under /opt/xamal
+      release.name   # systemd unit <release>@.service
+      caddy.host     # at most one app on a host may omit it (:80 catch-all)
+      caddy.app_port # each app uses app_port and app_port+1
+
+      # app one            # app two
+      caddy:               caddy:
+        host: one.com        host: two.com
+        app_port: 4000       app_port: 4010
+
+    mix xamal.server.bootstrap refuses to install an app whose release name,
+    ports, or catch-all site would collide with another app on the host.
 
     ## Maintenance mode
 

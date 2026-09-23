@@ -6,6 +6,32 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Several apps can share one host. `mix xamal.server.bootstrap` now refuses to
+  install an app whose release name, ports (`app_port` and `app_port + 1`), or
+  `:80` catch-all site (no `caddy.host`) would collide with an app already on
+  the host. Each app records its ports in `/opt/xamal/<service>/ports`.
+
+### Changed
+
+- Bootstrap only appends `import /opt/xamal/*/Caddyfile` to
+  `/etc/caddy/Caddyfile` when it is missing, instead of overwriting the file,
+  so sites and global options managed there are kept. When Xamal installs
+  Caddy itself it still replaces the package's default welcome site.
+- Bootstrap enables and starts the Caddy service.
+- A rejected Caddy reload now stops the deploy (and bootstrap, maintenance,
+  live, remove) with Caddy's error, instead of carrying on and stopping the old
+  release while Caddy still pointed at it.
+
+### Fixed
+
+- Every Caddy reload loaded only the current app's Caddyfile, replacing the
+  running config. With two apps on a host, deploying one took the other's site
+  offline. Reloads now use `/etc/caddy/Caddyfile`, which imports every app.
+- `mix xamal.remove` now reloads Caddy, so the removed app's site stops being
+  served.
+
 ## [0.5.0]
 
 ### Added

@@ -255,6 +255,30 @@ mix xamal.deploy -d production
 
 With override files like `config/xamal/staging.exs` and secrets in `.xamal/secrets.staging`.
 
+## Multiple apps on one host
+
+Several apps can share a server and its Caddy. Each app gets its own
+directory, systemd unit, and Caddyfile, and `/etc/caddy/Caddyfile` imports
+them all. Give each app a distinct:
+
+- `service`
+- `release.name`
+- `caddy.host` (one app per host may leave it unset and serve every other hostname)
+- `caddy.app_port` (each app uses `app_port` and `app_port + 1`)
+
+```elixir
+# app one                                 # app two
+caddy: [host: "one.com", app_port: 4000]  caddy: [host: "two.com", app_port: 4010]
+```
+
+`mix xamal.server.bootstrap` refuses to install an app whose release name,
+ports, or catch-all site would collide with an app already on the host.
+Bootstrap only adds the import line to `/etc/caddy/Caddyfile` if it is
+missing, so sites you manage there yourself are kept.
+
+Destinations of the same service share its directory, so to run staging and
+production on one host, give each destination its own `service` name.
+
 ## License
 
 MIT
