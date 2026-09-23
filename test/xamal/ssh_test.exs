@@ -59,5 +59,88 @@ defmodule Xamal.SSHTest do
 
       assert ["-P", "22"] == Enum.slice(args, 2, 2)
     end
+
+    test "sets IdentitiesOnly so agent keys don't exhaust MaxAuthTries" do
+      args = Xamal.SSH.scp_args("/keys/id", "deploy", "host", 22, "local", "remote")
+
+      assert "IdentitiesOnly=yes" in args
+    end
+
+    test "orders paths local-then-remote for an upload" do
+      args =
+        Xamal.SSH.scp_args("/keys/id", "deploy", "host", 22, "/local/f", "/remote/f", :upload)
+
+      assert ["/local/f", "deploy@host:/remote/f"] == Enum.take(args, -2)
+    end
+
+    test "orders paths remote-then-local for a download" do
+      args =
+        Xamal.SSH.scp_args("/keys/id", "deploy", "host", 22, "/local/f", "/remote/f", :download)
+
+      assert ["deploy@host:/remote/f", "/local/f"] == Enum.take(args, -2)
+    end
+  end
+
+  describe "sftp_path/1" do
+    test "drops a leading ~/ since SFTP resolves relative paths against home" do
+      assert Xamal.SSH.sftp_path("~/.xamal/builds/app/x.tar.gz") == ".xamal/builds/app/x.tar.gz"
+    end
+
+    test "leaves absolute and relative paths alone" do
+      assert Xamal.SSH.sftp_path("/opt/xamal/x.tar.gz") == "/opt/xamal/x.tar.gz"
+      assert Xamal.SSH.sftp_path("x.tar.gz") == "x.tar.gz"
+    end
+  end
+
+  describe "ssh_flags/2" do
+    test "uses lowercase -p for the port, unlike scp" do
+      flags = Xamal.SSH.ssh_flags(%Ssh{keys: []}, 2222)
+
+      assert "-p" in flags
+      refute "-P" in flags
+      assert "2222" in flags
+    end
+
+    test "carries the non-interactive options" do
+      flags = Xamal.SSH.ssh_flags(%Ssh{keys: []}, 22)
+
+      assert "BatchMode=yes" in flags
+      assert "StrictHostKeyChecking=accept-new" in flags
+    end
+
+    test "includes an identity flag when a key file exists on disk" do
+      path = Path.join(System.tmp_dir!(), "xamal_ssh_flags_test_key")
+      File.write!(path, "")
+
+      try do
+        flags = Xamal.SSH.ssh_flags(%Ssh{keys: [path]}, 22)
+        assert ["-i", path] == Enum.take(flags, 2)
+      after
+        File.rm(path)
+      end
+    end
+
+    test "sets IdentitiesOnly with a key file so agent keys don't exhaust MaxAuthTries" do
+      path = Path.join(System.tmp_dir!(), "xamal_ssh_flags_ident_only_key")
+      File.write!(path, "")
+
+      try do
+        assert "IdentitiesOnly=yes" in Xamal.SSH.ssh_flags(%Ssh{keys: [path]}, 22)
+      after
+        File.rm(path)
+      end
+    end
+
+    test "omits the identity flag for key_data and agent flows" do
+      flags = Xamal.SSH.ssh_flags(%Ssh{keys: []}, 22)
+
+      refute "-i" in flags
+    end
+
+    test "carries no user@host destination, so callers compose their own" do
+      flags = Xamal.SSH.ssh_flags(%Ssh{keys: []}, 22)
+
+      refute Enum.any?(flags, &String.contains?(&1, "@"))
+    end
   end
 end

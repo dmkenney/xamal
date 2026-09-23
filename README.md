@@ -37,7 +37,7 @@ Add Xamal as a Mix dependency in the application you deploy:
 # mix.exs
 defp deps do
   [
-    {:xamal, "~> 0.4", only: [:dev, :test], runtime: false}
+    {:xamal, "~> 0.5", only: [:dev, :test], runtime: false}
   ]
 end
 ```
@@ -129,6 +129,38 @@ Without this, `mix release my_app` will fail with `Unknown release :my_app`.
 Because this is Elixir config, normal Elixir expressions such as `System.get_env/1` are available. Use regular Mix aliases in your application's `mix.exs` for command shortcuts.
 
 Run `mix xamal.docs <topic>` for detailed reference on any config section.
+
+## Builders
+
+Releases are built locally by default. Two other modes exist for when the
+build environment has to match the servers — ERTS, NIFs, and port drivers are
+compiled into the release tarball, so they are linked against the build
+machine's OpenSSL and glibc and built for its CPU architecture.
+
+```elixir
+config :xamal,
+  builder: [docker: true]                  # build in a Linux container
+  # builder: [docker: "hexpm/elixir:1.18.3-erlang-27.2.3-debian-bookworm-20250113"]
+  # builder: [remote: "build@build-server"] # build on another host over SSH
+```
+
+**Docker** runs the build in a Linux container. Pin the image to match your
+server's distro and OpenSSL. No `--platform` flag is passed, so the container
+inherits your host's architecture — an arm64 laptop produces arm64 binaries.
+The container bind-mounts your working directory and writes into the local
+`_build`, so a stale native `_build` can leak in.
+
+**Remote** builds on another host over SSH. Source is synced with
+`git archive HEAD`, so only committed code is built — uncommitted changes are
+not sent. The build host needs Elixir and OTP installed at versions matching
+the targets, on the `PATH` for non-interactive SSH sessions (`~/.bashrc` is
+not sourced for those). The finished tarball is copied back locally, then
+uploaded to the servers like any other build.
+
+Use remote mode when the build environment must match production exactly, or
+when Docker cannot produce binaries for the target OS at all — FreeBSD, for
+instance. Pointing `remote` at a deploy host is the strongest guarantee that
+NIFs and OpenSSL match.
 
 ## Commands
 

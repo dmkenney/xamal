@@ -28,6 +28,42 @@ defmodule Xamal.Commands.BuilderTest do
     end
   end
 
+  describe "build_release_remote/1" do
+    test "runs the same build steps as a local build" do
+      cmd_str = Enum.join(Builder.build_release_remote(@config), " ")
+
+      assert cmd_str =~ "MIX_ENV=prod"
+      assert cmd_str =~ "mix deps.get"
+      assert cmd_str =~ "mix release my_app"
+      assert cmd_str =~ "--overwrite"
+    end
+
+    test "cds into the build directory first" do
+      cmd_str = Enum.join(Builder.build_release_remote(@config), " ")
+
+      assert cmd_str =~ "cd ~/.xamal/builds/my-app"
+      # A remote SSH command starts in the build user's home, so the cd has to
+      # come before any of the relative-path mix steps.
+      assert String.starts_with?(cmd_str, "cd ~/.xamal/builds/my-app")
+    end
+  end
+
+  describe "create_tarball_remote/1" do
+    test "cds into the build directory then tars" do
+      cmd_str = Enum.join(Builder.create_tarball_remote(@config), " ")
+
+      assert String.starts_with?(cmd_str, "cd ~/.xamal/builds/my-app")
+      assert cmd_str =~ "tar -czf _build/prod/my_app-abc1234.tar.gz"
+    end
+  end
+
+  describe "remote_tarball_path/1" do
+    test "is the build directory plus the local tarball path" do
+      assert Builder.remote_tarball_path(@config) ==
+               "~/.xamal/builds/my-app/_build/prod/my_app-abc1234.tar.gz"
+    end
+  end
+
   describe "create_tarball/1" do
     test "builds tar command" do
       cmd = Builder.create_tarball(@config)

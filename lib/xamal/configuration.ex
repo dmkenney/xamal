@@ -217,6 +217,14 @@ defmodule Xamal.Configuration do
     "#{run_directory()}/lock-#{service(config)}"
   end
 
+  @doc """
+  Workspace on the `builder.remote` host where source is synced and the
+  release is built. Per-service, so one build host can serve several apps.
+  """
+  def build_directory(%__MODULE__{} = config) do
+    "#{run_directory()}/builds/#{service(config)}"
+  end
+
   def audit_log_path(%__MODULE__{} = config) do
     "#{run_directory()}/#{service(config)}-audit.log"
   end

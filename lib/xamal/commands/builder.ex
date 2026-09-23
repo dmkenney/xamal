@@ -12,14 +12,49 @@ defmodule Xamal.Commands.Builder do
   Build the release locally with mix release.
   """
   def build_release(config) do
+    combine(build_release_steps(config))
+  end
+
+  defp build_release_steps(config) do
     release_name = config.release.name
     mix_env = config.release.mix_env
 
-    combine([
+    [
       ["MIX_ENV=#{mix_env}", "mix", "deps.get", "--only", mix_env],
       ["MIX_ENV=#{mix_env}", "mix", "assets.deploy"],
       ["MIX_ENV=#{mix_env}", "mix", "release", release_name, "--overwrite"]
+    ]
+  end
+
+  @doc """
+  Build the release on the `builder.remote` host.
+
+  Same steps as `build_release/1`, but prefixed with a `cd` into the synced
+  source directory — the local build inherits the project root as its working
+  directory, a remote SSH command starts in the build user's home.
+  """
+  def build_release_remote(config) do
+    combine([["cd", Configuration.build_directory(config)] | build_release_steps(config)])
+  end
+
+  @doc """
+  Create the tarball on the `builder.remote` host.
+
+  Writes to the same `_build/<env>/` relative path the local build uses, so
+  `remote_tarball_path/1` is just the build directory plus `tarball_path/1`.
+  """
+  def create_tarball_remote(config) do
+    combine([
+      ["cd", Configuration.build_directory(config)],
+      create_tarball(config)
     ])
+  end
+
+  @doc """
+  Absolute path of the tarball on the `builder.remote` host.
+  """
+  def remote_tarball_path(config) do
+    "#{Configuration.build_directory(config)}/#{tarball_path(config)}"
   end
 
   @doc """
