@@ -48,6 +48,7 @@ defmodule Xamal.Configuration.Ssh do
     ]
     |> put_key_options(ssh)
     |> put_config_options(ssh)
+    |> put_proxy_options(ssh)
     |> Keyword.put(:connect_timeout, ssh.connect_timeout)
   end
 
@@ -55,14 +56,39 @@ defmodule Xamal.Configuration.Ssh do
     opts ++ [key_cb: {Xamal.SSH.KeyProvider, key_data: key_data}]
   end
 
-  defp put_key_options(opts, %{keys: keys}) when not is_nil(keys) do
-    # Path.expand resolves a leading ~ — Erlang's :ssh does not, and would
-    # otherwise stat a literal "~/.ssh" directory and fail with :enoent.
-    user_dir = keys |> hd() |> Path.expand() |> Path.dirname() |> String.to_charlist()
-    opts ++ [user_dir: user_dir]
+  # Load the configured key file itself. Pointing :ssh at the key's directory
+  # (user_dir) only finds standard names like id_ed25519, so a key called
+  # deploy_key was silently ignored.
+  defp put_key_options(opts, %{keys: keys} = ssh) when is_list(keys) do
+    case key_file(ssh) do
+      {:ok, path} -> opts ++ [key_cb: {Xamal.SSH.KeyProvider, key_data: File.read!(path)}]
+      :none -> opts
+    end
   end
 
   defp put_key_options(opts, _ssh), do: opts
+
+  @doc """
+  The first configured key in `ssh.keys` that exists on disk, as
+  `{:ok, expanded_path}`, or `:none`.
+  """
+  def key_file(%{keys: keys}) when is_list(keys) do
+    Enum.find_value(keys, :none, fn k ->
+      expanded = Path.expand(k)
+      if File.exists?(expanded), do: {:ok, expanded}, else: false
+    end)
+  end
+
+  def key_file(_), do: :none
+
+  # Consumed by Xamal.SSH.Proxy before the options reach :ssh.connect/4.
+  defp put_proxy_options(opts, %{proxy: proxy}) when is_binary(proxy),
+    do: opts ++ [xamal_proxy: proxy]
+
+  defp put_proxy_options(opts, %{proxy_command: command}) when is_binary(command),
+    do: opts ++ [xamal_proxy_command: command]
+
+  defp put_proxy_options(opts, _ssh), do: opts
 
   defp put_config_options(opts, %{config: false}), do: opts ++ [ssh_config: :disabled]
   defp put_config_options(opts, _ssh), do: opts

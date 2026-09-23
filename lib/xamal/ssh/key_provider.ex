@@ -30,14 +30,33 @@ defmodule Xamal.SSH.KeyProvider do
 
   defp decode_pem_key(pem_data, algorithm) when is_binary(pem_data) do
     pem_data
-    |> :public_key.pem_decode()
-    |> Enum.find_value(:none, fn entry ->
-      key = :public_key.pem_entry_decode(entry)
+    |> decode_keys()
+    |> Enum.find_value(:none, fn key ->
       if key_matches_algorithm?(key, algorithm), do: {:ok, key}
     end)
   end
 
   defp decode_pem_key(_, _), do: :none
+
+  # "-----BEGIN OPENSSH PRIVATE KEY-----" is what ssh-keygen writes by default;
+  # :public_key only reads the older PEM formats (RSA/EC/PKCS#8).
+  defp decode_keys(data) do
+    case :ssh_file.decode(data, :openssh_key_v1) do
+      entries when is_list(entries) and entries != [] ->
+        Enum.map(entries, fn {key, _attrs} -> key end)
+
+      _ ->
+        data
+        |> :public_key.pem_decode()
+        |> Enum.flat_map(&decode_pem_entry/1)
+    end
+  end
+
+  defp decode_pem_entry(entry) do
+    [:public_key.pem_entry_decode(entry)]
+  rescue
+    _ -> []
+  end
 
   # PKCS#8 Ed25519 (OID 1.3.101.112)
   defp key_matches_algorithm?(

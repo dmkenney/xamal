@@ -143,4 +143,37 @@ defmodule Xamal.SSHTest do
       refute Enum.any?(flags, &String.contains?(&1, "@"))
     end
   end
+
+  describe "proxy_flags/1" do
+    test "turns a jump host into a ProxyCommand that carries the key" do
+      path = Path.join(System.tmp_dir!(), "xamal_proxy_key_#{System.unique_integer([:positive])}")
+      File.write!(path, "")
+      on_exit(fn -> File.rm(path) end)
+
+      ssh = %Ssh{user: "deploy", keys: [path], proxy: "admin@bastion:2222"}
+
+      assert Xamal.SSH.proxy_flags(ssh) == [
+               "-o",
+               "ProxyCommand=ssh -i '#{path}' -o IdentitiesOnly=yes -o BatchMode=yes " <>
+                 "-o StrictHostKeyChecking=accept-new -p 2222 -W %h:%p admin@bastion"
+             ]
+    end
+
+    test "defaults the jump user to ssh.user and the port to 22" do
+      [_, command] = Xamal.SSH.proxy_flags(%Ssh{user: "deploy", keys: [], proxy: "bastion"})
+
+      assert command ==
+               "ProxyCommand=ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new " <>
+                 "-p 22 -W %h:%p deploy@bastion"
+    end
+
+    test "passes a proxy command straight through" do
+      assert Xamal.SSH.proxy_flags(%Ssh{proxy_command: "nc %h %p"}) ==
+               ["-o", "ProxyCommand=nc %h %p"]
+    end
+
+    test "is empty without a proxy" do
+      assert Xamal.SSH.proxy_flags(%Ssh{}) == []
+    end
+  end
 end

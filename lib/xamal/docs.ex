@@ -111,12 +111,33 @@ defmodule Xamal.Docs do
       ssh:
         user: deploy          # SSH user (default: root)
         port: 22              # SSH port (default: 22)
-        proxy: jump-host      # SSH proxy/jump host
-        keys: ["~/.ssh/id_ed25519"]  # Specific key files
-        keys_only: true       # Only use specified keys
+        keys: ["~/.ssh/deploy_key"]  # Private key file (first one that exists)
+        key_data: "..."       # Or the private key itself, e.g. from a secret store
 
     SSH connections use Erlang's :ssh stdlib with connection pooling.
     Connections are reused across commands and time out after 900s idle.
+    Keys may be OpenSSH format (what ssh-keygen writes) or PEM, and must not
+    have a passphrase. Only the configured key is used, never an ssh-agent.
+
+    ## Jump host
+
+      ssh:
+        proxy: admin@bastion.example.com:2222   # [user@]host[:port]
+
+    Connections go through the jump host, using the same key. The user
+    defaults to ssh.user and the port to 22.
+
+    ## Proxy command
+
+      ssh:
+        proxy_command: "cloudflared access ssh --hostname %h"
+
+    Like OpenSSH's ProxyCommand: the command's stdin/stdout carry the SSH
+    connection. %h, %p, and %r expand to the host, port, and user. Set either
+    proxy or proxy_command, not both.
+
+    keys_only is accepted for Kamal compatibility; Xamal always uses only the
+    configured key.
     """)
   end
 
