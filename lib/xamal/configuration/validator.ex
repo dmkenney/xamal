@@ -10,8 +10,16 @@ defmodule Xamal.Configuration.Validator do
     validate_servers!(config)
     validate_retain_releases!(config)
     validate_destination!(config)
+    validate_ssh_proxy!(config)
     :ok
   end
+
+  defp validate_ssh_proxy!(%{ssh: %{proxy: proxy, proxy_command: command}})
+       when is_binary(proxy) and is_binary(command) do
+    raise ArgumentError, "Set only one of ssh.proxy and ssh.proxy_command"
+  end
+
+  defp validate_ssh_proxy!(_config), do: :ok
 
   defp validate_service!(config) do
     service = Configuration.service(config)

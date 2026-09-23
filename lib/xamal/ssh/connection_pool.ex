@@ -8,6 +8,8 @@ defmodule Xamal.SSH.ConnectionPool do
 
   use GenServer
 
+  alias Xamal.SSH.Proxy
+
   defstruct connections: %{}, idle_timeout: 900_000
 
   # Client API
@@ -43,26 +45,27 @@ defmodule Xamal.SSH.ConnectionPool do
     case Map.get(state.connections, key) do
       nil ->
         case connect(host, port, connect_opts) do
-          {:ok, conn} ->
-            connections = Map.put(state.connections, key, %{conn: conn, timer: nil})
+          {:ok, conn, cleanup} ->
+            entry = %{conn: conn, timer: nil, cleanup: cleanup}
+            connections = Map.put(state.connections, key, entry)
             {:reply, {:ok, conn}, %{state | connections: connections}}
 
           {:error, reason} ->
             {:reply, {:error, reason}, state}
         end
 
-      %{conn: conn, timer: timer} ->
+      %{conn: conn, timer: timer} = entry ->
         if timer, do: Process.cancel_timer(timer)
-        connections = Map.put(state.connections, key, %{conn: conn, timer: nil})
+        connections = Map.put(state.connections, key, %{entry | timer: nil})
         {:reply, {:ok, conn}, %{state | connections: connections}}
     end
   end
 
   @impl true
   def handle_call(:close_all, _from, state) do
-    Enum.each(state.connections, fn {_key, %{conn: conn, timer: timer}} ->
-      if timer, do: Process.cancel_timer(timer)
-      :ssh.close(conn)
+    Enum.each(state.connections, fn {_key, entry} ->
+      if entry.timer, do: Process.cancel_timer(entry.timer)
+      close(entry)
     end)
 
     {:reply, :ok, %{state | connections: %{}}}
@@ -76,9 +79,9 @@ defmodule Xamal.SSH.ConnectionPool do
       nil ->
         {:noreply, state}
 
-      %{conn: conn} ->
+      entry ->
         timer = Process.send_after(self(), {:idle_timeout, key}, state.idle_timeout)
-        connections = Map.put(state.connections, key, %{conn: conn, timer: timer})
+        connections = Map.put(state.connections, key, %{entry | timer: timer})
         {:noreply, %{state | connections: connections}}
     end
   end
@@ -89,26 +92,31 @@ defmodule Xamal.SSH.ConnectionPool do
       nil ->
         {:noreply, state}
 
-      %{conn: conn} ->
-        :ssh.close(conn)
+      entry ->
+        close(entry)
         {:noreply, %{state | connections: Map.delete(state.connections, key)}}
     end
   end
 
   defp connect(host, port, connect_opts) do
-    host_charlist = to_charlist(host)
     timeout = Keyword.get(connect_opts, :connect_timeout, 15_000)
 
     opts =
       [silently_accept_hosts: true, user_interaction: false] ++
         connect_opts
 
-    case :ssh.connect(host_charlist, port, opts, timeout) do
-      {:ok, conn} ->
-        {:ok, conn}
+    case Proxy.connect(host, port, opts, timeout) do
+      {:ok, conn, cleanup} ->
+        {:ok, conn, cleanup}
 
       {:error, reason} ->
         {:error, {:ssh_connection_failed, host, port, reason}}
     end
+  end
+
+  # Close the target connection, then whatever its proxy opened.
+  defp close(%{conn: conn, cleanup: cleanup}) do
+    :ssh.close(conn)
+    cleanup.()
   end
 end

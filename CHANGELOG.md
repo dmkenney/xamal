@@ -12,6 +12,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   install an app whose release name, ports (`app_port` and `app_port + 1`), or
   `:80` catch-all site (no `caddy.host`) would collide with an app already on
   the host. Each app records its ports in `/opt/xamal/<service>/ports`.
+- `ssh.proxy` (jump host, `[user@]host[:port]`) and `ssh.proxy_command`
+  (OpenSSH-style, with `%h`, `%p`, `%r`) now work for every connection:
+  Erlang SSH commands, scp and SFTP transfers, and the `builder.remote`
+  source sync. Setting both is a config error.
 
 ### Changed
 
@@ -31,6 +35,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   offline. Reloads now use `/etc/caddy/Caddyfile`, which imports every app.
 - `mix xamal.remove` now reloads Caddy, so the removed app's site stops being
   served.
+- `ssh.proxy` and `ssh.proxy_command` were parsed and documented but ignored,
+  so connections went direct.
+- `ssh.keys` only worked with standard key filenames (`id_ed25519`, `id_rsa`,
+  ...) because only the key's directory was passed to Erlang `:ssh`. The
+  configured file is now loaded directly.
+- `ssh.key_data` and `ssh.keys` now accept OpenSSH-format keys (the
+  `ssh-keygen` default). Previously these raised a `FunctionClauseError`.
 
 ## [0.5.0]
 

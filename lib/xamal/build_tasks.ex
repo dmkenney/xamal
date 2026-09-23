@@ -167,7 +167,12 @@ defmodule Xamal.BuildTasks do
   defp sync_source_to_remote!(config) do
     destination = config.builder.remote
     dir = Configuration.build_directory(config)
-    flags = config.ssh |> SSH.ssh_flags(config.ssh.port) |> Enum.join(" ")
+
+    flags =
+      config.ssh
+      |> SSH.ssh_flags(config.ssh.port)
+      |> Enum.map_join(" ", &Xamal.Utils.shell_escape/1)
+
     remote_setup = "mkdir -p #{dir} && tar -x -C #{dir}"
     pipeline = "git archive --format=tar HEAD | ssh #{flags} #{destination} '#{remote_setup}'"
 

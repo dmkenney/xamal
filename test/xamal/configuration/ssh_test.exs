@@ -56,27 +56,36 @@ defmodule Xamal.Configuration.SshTest do
       assert Keyword.get(opts, :user_interaction) == false
     end
 
-    test "includes user_dir when keys specified" do
-      ssh = Ssh.new(%{"keys" => ["~/.ssh/id_ed25519"]})
-      opts = Ssh.connect_options(ssh)
+    test "loads the configured key file itself, whatever its name" do
+      path = Path.join(System.tmp_dir!(), "deploy_key_#{System.unique_integer([:positive])}")
+      File.write!(path, "key contents")
+      on_exit(fn -> File.rm(path) end)
 
-      assert Keyword.has_key?(opts, :user_dir)
+      opts = Ssh.connect_options(Ssh.new(%{"keys" => [path]}))
+
+      assert Keyword.get(opts, :key_cb) ==
+               {Xamal.SSH.KeyProvider, key_data: "key contents"}
+
+      refute Keyword.has_key?(opts, :user_dir)
     end
 
-    test "expands a leading ~ in the key path for user_dir" do
-      ssh = Ssh.new(%{"keys" => ["~/.ssh/id_ed25519"]})
-      user_dir = ssh |> Ssh.connect_options() |> Keyword.get(:user_dir)
+    test "uses :ssh defaults when no configured key exists on disk" do
+      opts = Ssh.connect_options(Ssh.new(%{"keys" => ["/nonexistent/xamal/key"]}))
 
-      # Erlang's :ssh does not expand ~; it must already be an absolute path.
-      assert user_dir == String.to_charlist(Path.expand("~/.ssh"))
-      refute List.starts_with?(user_dir, ~c"~")
+      refute Keyword.has_key?(opts, :key_cb)
+      refute Keyword.has_key?(opts, :user_dir)
     end
 
-    test "passes through an absolute key path unchanged" do
-      ssh = Ssh.new(%{"keys" => ["/etc/xamal/keys/id_ed25519"]})
-      user_dir = ssh |> Ssh.connect_options() |> Keyword.get(:user_dir)
+    test "passes a jump host through for Xamal.SSH.Proxy" do
+      opts = Ssh.connect_options(Ssh.new(%{"proxy" => "admin@bastion:2222"}))
 
-      assert user_dir == ~c"/etc/xamal/keys"
+      assert Keyword.get(opts, :xamal_proxy) == "admin@bastion:2222"
+    end
+
+    test "passes a proxy command through for Xamal.SSH.Proxy" do
+      opts = Ssh.connect_options(Ssh.new(%{"proxy_command" => "nc %h %p"}))
+
+      assert Keyword.get(opts, :xamal_proxy_command) == "nc %h %p"
     end
   end
 end

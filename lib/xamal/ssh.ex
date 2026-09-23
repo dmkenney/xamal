@@ -7,7 +7,7 @@ defmodule Xamal.SSH do
   """
 
   alias Xamal.Configuration.{Boot, Ssh}
-  alias Xamal.SSH.{ConnectionPool, Host, Runner}
+  alias Xamal.SSH.{ConnectionPool, Host, Proxy, Runner}
 
   @doc """
   Execute a function on each host in parallel.
@@ -97,7 +97,7 @@ defmodule Xamal.SSH do
     case key_file(ssh_config) do
       {:ok, key_path} ->
         if scp_available?() do
-          upload_via_scp(key_path, ssh_config.user, hostname, port, local_path, remote_path)
+          upload_via_scp(key_path, ssh_config, hostname, port, local_path, remote_path)
         else
           upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path)
         end
@@ -150,7 +150,7 @@ defmodule Xamal.SSH do
     with :ok <- ensure_parent_directory(local_path) do
       case scp_key_for_download(ssh_config) do
         {:ok, key_path} ->
-          download_via_scp(key_path, ssh_config.user, hostname, port, remote_path, local_path)
+          download_via_scp(key_path, ssh_config, hostname, port, remote_path, local_path)
 
         :none ->
           download_via_sftp_pooled(ssh_config, hostname, port, remote_path, local_path)
@@ -174,8 +174,10 @@ defmodule Xamal.SSH do
     end
   end
 
-  defp download_via_scp(key_path, user, hostname, port, remote_path, local_path) do
-    args = scp_args(key_path, user, hostname, port, local_path, remote_path, :download)
+  defp download_via_scp(key_path, ssh_config, hostname, port, remote_path, local_path) do
+    args =
+      proxy_flags(ssh_config) ++
+        scp_args(key_path, ssh_config.user, hostname, port, local_path, remote_path, :download)
 
     case System.cmd("scp", args, stderr_to_stdout: true) do
       {_, 0} -> {:ok, local_path}
@@ -237,14 +239,7 @@ defmodule Xamal.SSH do
   `:none` for `key_data`/agent flows (no usable file). This selection is what
   decides whether `upload/4` uses scp or falls back to the in-VM SFTP channel.
   """
-  def key_file(%{keys: keys}) when is_list(keys) do
-    Enum.find_value(keys, :none, fn k ->
-      expanded = Path.expand(k)
-      if File.exists?(expanded), do: {:ok, expanded}, else: false
-    end)
-  end
-
-  def key_file(_), do: :none
+  defdelegate key_file(ssh_config), to: Ssh
 
   @doc """
   The option flags for a system `ssh` invocation, without a `user@host`
@@ -270,11 +265,43 @@ defmodule Xamal.SSH do
     # IdentitiesOnly stops ssh offering every ssh-agent key before the -i one;
     # an agent holding several keys trips sshd's MaxAuthTries (default 6)
     # and disconnects with "Too many authentication failures".
-    case key_file(ssh_config) do
-      {:ok, key_path} -> ["-i", key_path] ++ flags ++ ["-o", "IdentitiesOnly=yes"]
-      :none -> flags
-    end
+    identity =
+      case key_file(ssh_config) do
+        {:ok, key_path} -> ["-i", key_path, "-o", "IdentitiesOnly=yes"]
+        :none -> []
+      end
+
+    identity ++ flags ++ proxy_flags(ssh_config)
   end
+
+  @doc """
+  Flags that route a system `ssh`/`scp` call through `ssh.proxy` or
+  `ssh.proxy_command`.
+
+  A jump host becomes an explicit `ProxyCommand` rather than `-J`: OpenSSH
+  runs the `-J` hop as a separate ssh process that doesn't get our `-i` key,
+  so the hop fails unless the user's own ssh config happens to cover it.
+  """
+  def proxy_flags(%Ssh{proxy: proxy} = ssh_config) when is_binary(proxy) do
+    {user, host, port} = Proxy.parse_proxy(proxy, user: ssh_config.user)
+
+    identity =
+      case key_file(ssh_config) do
+        {:ok, key_path} -> "-i #{Xamal.Utils.shell_escape(key_path)} -o IdentitiesOnly=yes "
+        :none -> ""
+      end
+
+    [
+      "-o",
+      "ProxyCommand=ssh #{identity}-o BatchMode=yes -o StrictHostKeyChecking=accept-new " <>
+        "-p #{port} -W %h:%p #{user}@#{host}"
+    ]
+  end
+
+  def proxy_flags(%Ssh{proxy_command: command}) when is_binary(command),
+    do: ["-o", "ProxyCommand=#{command}"]
+
+  def proxy_flags(_ssh_config), do: []
 
   @doc """
   Build the argument list passed to the `scp` binary.
@@ -308,8 +335,10 @@ defmodule Xamal.SSH do
     end
   end
 
-  defp upload_via_scp(key_path, user, hostname, port, local_path, remote_path) do
-    args = scp_args(key_path, user, hostname, port, local_path, remote_path)
+  defp upload_via_scp(key_path, ssh_config, hostname, port, local_path, remote_path) do
+    args =
+      proxy_flags(ssh_config) ++
+        scp_args(key_path, ssh_config.user, hostname, port, local_path, remote_path)
 
     case System.cmd("scp", args, stderr_to_stdout: true) do
       {_, 0} -> {:ok, remote_path}
