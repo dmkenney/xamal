@@ -223,6 +223,11 @@ defmodule Xamal.Docs do
     The release name should match your mix.exs release configuration.
     Xamal builds with `MIX_ENV=<mix_env> mix release <name>` and
     packages the result as a tarball for distribution.
+
+    The release name also names the systemd unit (<name>@.service), which
+    every deploy updates from config. Changing the name is a migration:
+    deploy refuses while a unit under the old name exists, and prints the
+    commands to remove it before bootstrapping under the new name.
     """)
   end
 

@@ -9,7 +9,9 @@ defmodule Xamal.BlueGreen do
   alias Xamal.{Configuration, HealthCheck}
 
   def swap(host, config, version, opts, context) do
+    refuse_renamed_release!(host, config)
     ports = select_ports(host, config)
+    sync_unit(host, config)
     ssh_exec(host, Server.link_current(config, version), config)
     ssh_exec(host, Systemd.start(config, ports.new), config)
     wait_for_health!(host, config, ports.new, Keyword.get(opts, :rollback_version))
@@ -18,6 +20,66 @@ defmodule Xamal.BlueGreen do
     enable_new_release(host, config, ports)
     ssh_exec(host, Caddy.write_active_port(config, ports.new), config)
     ports.new
+  end
+
+  # Bootstrap is the only other place the unit is written, so without this a
+  # config change to it (drain_timeout, ssh.user, ...) never reached servers.
+  # The new definition applies to the instance started next in this swap; the
+  # serving instance keeps running.
+  defp sync_unit(host, config) do
+    case ssh_exec(host, Systemd.sync_unit(config), config) do
+      {:ok, output} ->
+        if output =~ "unit-updated" do
+          say("  Updated systemd unit #{config.release.name}@.service on #{host}", :yellow)
+        end
+
+      {:error, reason} ->
+        raise "Failed to update the systemd unit on #{host}: #{inspect(reason)}"
+    end
+  end
+
+  # A release.name change would install a unit under the new name and then
+  # stop instances that were never running, leaving the old-named instance
+  # serving on its port and enabled for reboot. Stop before touching anything.
+  defp refuse_renamed_release!(host, config) do
+    case ssh_exec(host, Systemd.units_under_other_names(config), config) do
+      {:ok, found} -> raise renamed_release_message(host, config, found)
+      {:error, _} -> :ok
+    end
+  end
+
+  @doc false
+  def renamed_release_message(host, config, found) do
+    old_names =
+      found
+      |> String.split("\n", trim: true)
+      |> Enum.map(&(&1 |> Path.basename() |> String.replace_suffix("@.service", "")))
+
+    ports = [config.caddy.app_port, Configuration.Caddy.alt_port(config.caddy)]
+
+    cleanup =
+      Enum.map_join(old_names, "\n", fn old ->
+        instances = Enum.map_join(ports, " ", &"#{old}@#{&1}")
+
+        "    sudo systemctl disable --now #{instances}\n" <>
+          "    sudo rm /etc/systemd/system/#{old}@.service"
+      end)
+
+    """
+    #{host} runs this app under a different release name (#{Enum.join(old_names, ", ")}), \
+    but release.name is now #{inspect(config.release.name)}.
+
+    Deploying would leave the old service running on its port and enabled on \
+    reboot. Renaming a release is a migration: on #{host}, stop and remove the \
+    old units, then bootstrap and deploy under the new name.
+
+    #{cleanup}
+        sudo systemctl daemon-reload
+
+    Then run: mix xamal.server.bootstrap && mix xamal.deploy
+
+    This takes the app down until the new deploy finishes.
+    """
   end
 
   defp select_ports(host, config) do

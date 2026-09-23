@@ -63,6 +63,41 @@ defmodule Xamal.Commands.Systemd do
   end
 
   @doc """
+  Write the template unit only if its content changed, then reload systemd.
+
+  Prints `unit-updated` when it replaced the file, so the caller can say
+  so. `daemon-reload` re-reads unit definitions without restarting running
+  services, so the serving instance keeps running and the new definition
+  applies from the next `systemctl start`.
+  """
+  def sync_unit(config) do
+    content = generate_unit_content(config)
+    escaped = String.replace(content, "'", "'\\''")
+    path = unit_path(config)
+    staged = "#{path}.xamal-new"
+
+    shell([
+      "echo '#{escaped}' | sudo tee #{staged} >/dev/null &&",
+      "if cmp -s #{staged} #{path}; then sudo rm -f #{staged};",
+      "else sudo mv #{staged} #{path} && sudo systemctl daemon-reload && echo unit-updated; fi"
+    ])
+  end
+
+  @doc """
+  Prints other template units that run this service (their `WorkingDirectory`
+  is this service's) under a different name, and succeeds (exit 0) only if
+  there are any. That's what a `release.name` change leaves behind.
+  """
+  def units_under_other_names(config) do
+    working_dir = "WorkingDirectory=#{Configuration.service_directory(config)}/current"
+
+    pipe([
+      ["grep", "-lxF", "'#{working_dir}'", "#{@unit_dir}/*@.service", "2>/dev/null"],
+      ["grep", "-vxF", unit_path(config)]
+    ])
+  end
+
+  @doc """
   Start a service instance on the given port.
   """
   def start(config, port) do

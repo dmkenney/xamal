@@ -19,6 +19,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Deploys (and rollbacks) now update the systemd unit from config before
+  starting the new instance, printing a line when it changed. Previously only
+  `mix xamal.server.bootstrap` wrote it, so changes such as `drain_timeout` or
+  `ssh.user` never reached servers unless bootstrap was re-run.
+- Deploy and bootstrap refuse to run when the server has a unit for this app
+  under a different release name, and print the commands to remove it.
+  Renaming `release.name` used to leave the old instance running on its port
+  and enabled on reboot, and broke the next deploy.
 - Bootstrap only appends `import /opt/xamal/*/Caddyfile` to
   `/etc/caddy/Caddyfile` when it is missing, instead of overwriting the file,
   so sites and global options managed there are kept. When Xamal installs
