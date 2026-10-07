@@ -8,6 +8,7 @@ defmodule Xamal.Configuration.Validator do
   def validate!(%Configuration{} = config) do
     validate_service!(config)
     validate_servers!(config)
+    validate_host_names!(config)
     validate_retain_releases!(config)
     validate_destination!(config)
     validate_ssh_proxy!(config)
@@ -46,6 +47,45 @@ defmodule Xamal.Configuration.Validator do
     if primary.hosts == [] do
       raise ArgumentError, "No servers specified for the #{primary.name} primary_role"
     end
+  end
+
+  # The same host may appear in several roles, but a name must always point at
+  # one address and an address must carry at most one name.
+  defp validate_host_names!(config) do
+    pairs =
+      config.roles
+      |> Enum.flat_map(fn role -> Map.to_list(role.host_names || %{}) end)
+      |> Enum.uniq()
+
+    pairs
+    |> Enum.group_by(fn {_address, name} -> name end, fn {address, _name} -> address end)
+    |> Enum.each(fn
+      {_name, [_]} ->
+        :ok
+
+      {name, addresses} ->
+        raise ArgumentError,
+              "Host name '#{name}' is used for more than one address: #{Enum.join(addresses, ", ")}"
+    end)
+
+    pairs
+    |> Enum.group_by(fn {address, _name} -> address end, fn {_address, name} -> name end)
+    |> Enum.each(fn
+      {_address, [_]} ->
+        :ok
+
+      {address, names} ->
+        raise ArgumentError,
+              "Host #{address} has more than one name: #{Enum.join(names, ", ")}"
+    end)
+
+    addresses = Configuration.all_hosts(config)
+
+    Enum.each(pairs, fn {address, name} ->
+      if name != address and name in addresses do
+        raise ArgumentError, "Host name '#{name}' is also the address of another host"
+      end
+    end)
   end
 
   defp validate_retain_releases!(config) do

@@ -20,8 +20,8 @@ defmodule Xamal.Prune do
       cmd = PruneCommand.releases(config)
 
       case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
-        {:ok, _} -> say("  Pruned on #{host}", :green)
-        {:error, _} -> say("  Nothing to prune on #{host}", :yellow)
+        {:ok, _} -> say("  Pruned on #{host_label(config, host)}", :green)
+        {:error, _} -> say("  Nothing to prune on #{host_label(config, host)}", :yellow)
       end
     end)
   end

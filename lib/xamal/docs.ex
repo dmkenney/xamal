@@ -90,6 +90,20 @@ defmodule Xamal.Docs do
             clear:
               WORKER_MODE: "true"
 
+    ## Named hosts
+
+      servers: [
+        web: [east: "10.116.103.172", west: "10.116.236.144"],
+        worker: [hosts: ["10.0.0.5", jobs: "10.0.0.6"]]
+      ]
+
+    A host is either an address or `name: address`. SSH connects to the
+    address; the name is a label. `-h` matches names or addresses, with
+    wildcards (`-h east`, `-h east,west`, `-h 10.116.*`), and fails if a
+    pattern matches no host. Output labels named hosts as `east (10.116.103.172)`.
+    Locks, audit logs, and server state are keyed by address, so renaming a
+    host changes nothing on the server. Names must be unique.
+
     ## Tags
 
       servers:
@@ -316,7 +330,8 @@ defmodule Xamal.Docs do
 
       XAMAL_SERVICE           Service name
       XAMAL_VERSION           Version being deployed
-      XAMAL_HOSTS             Comma-separated host list
+      XAMAL_HOSTS             Comma-separated host addresses
+      XAMAL_HOST_NAMES        Host names in the same order (address if unnamed)
       XAMAL_ROLE              Current role
       XAMAL_DESTINATION       Destination name
       XAMAL_COMMAND           Current command (e.g. "deploy")

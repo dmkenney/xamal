@@ -179,6 +179,30 @@ defmodule Xamal.Configuration do
 
   def app_hosts(%__MODULE__{} = config), do: all_hosts(config)
 
+  @doc """
+  Map of host address => name for hosts configured with a name.
+  """
+  def host_names(%__MODULE__{roles: nil}), do: %{}
+
+  def host_names(%__MODULE__{roles: roles}) do
+    Enum.reduce(roles, %{}, fn role, acc -> Map.merge(acc, role.host_names || %{}) end)
+  end
+
+  @doc """
+  The configured name for a host address, or nil.
+  """
+  def host_name(%__MODULE__{} = config, host), do: Map.get(host_names(config), host)
+
+  @doc """
+  Display label for a host: `"name (address)"` when named, else the address.
+  """
+  def host_label(%__MODULE__{} = config, host) do
+    case host_name(config, host) do
+      nil -> host
+      name -> "#{name} (#{host})"
+    end
+  end
+
   def role(%__MODULE__{roles: roles}, name) do
     Enum.find(roles, fn r -> r.name == name end)
   end
@@ -305,7 +329,10 @@ defmodule Xamal.Configuration do
 
   defp normalize_config(config) when is_list(config) do
     if Keyword.keyword?(config) do
-      Enum.into(config, %{}, fn {key, value} -> {normalize_key(key), normalize_config(value)} end)
+      Enum.into(config, %{}, fn
+        {:servers, value} -> {"servers", normalize_servers(value)}
+        {key, value} -> {normalize_key(key), normalize_config(value)}
+      end)
     else
       Enum.map(config, &normalize_config/1)
     end
@@ -320,6 +347,52 @@ defmodule Xamal.Configuration do
   end
 
   defp normalize_config(value), do: value
+
+  # Host lists keep their order (the first host is the primary), so named
+  # hosts (`[east: "10.0.0.1"]`) become single-entry maps instead of one map.
+  defp normalize_servers(servers) when is_list(servers) do
+    if Keyword.keyword?(servers) and servers != [] do
+      Map.new(servers, fn {role, value} -> {normalize_key(role), normalize_role(value)} end)
+    else
+      normalize_hosts(servers)
+    end
+  end
+
+  defp normalize_servers(servers) when is_map(servers) do
+    Map.new(servers, fn {role, value} -> {normalize_key(role), normalize_role(value)} end)
+  end
+
+  defp normalize_servers(servers), do: normalize_config(servers)
+
+  defp normalize_role(role) when is_list(role) do
+    if Keyword.has_key?(role, :hosts) do
+      normalize_role_options(role)
+    else
+      normalize_hosts(role)
+    end
+  end
+
+  defp normalize_role(role) when is_map(role), do: normalize_role_options(role)
+
+  defp normalize_role(role), do: normalize_config(role)
+
+  defp normalize_role_options(role) do
+    Map.new(role, fn {key, value} ->
+      case normalize_key(key) do
+        "hosts" -> {"hosts", normalize_hosts(value)}
+        key -> {key, normalize_config(value)}
+      end
+    end)
+  end
+
+  defp normalize_hosts(hosts) when is_list(hosts) do
+    Enum.map(hosts, fn
+      {name, address} -> %{normalize_key(name) => normalize_config(address)}
+      host -> normalize_config(host)
+    end)
+  end
+
+  defp normalize_hosts(hosts), do: normalize_config(hosts)
 
   defp normalize_key(key) when is_atom(key), do: Atom.to_string(key)
   defp normalize_key(key), do: key

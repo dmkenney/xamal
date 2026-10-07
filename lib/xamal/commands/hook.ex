@@ -5,6 +5,8 @@ defmodule Xamal.Commands.Hook do
   Hooks are shell scripts in the hooks_path directory (default: .xamal/hooks).
   """
 
+  alias Xamal.Configuration
+
   @doc """
   Build the command to run a hook script locally.
   """
@@ -16,13 +18,16 @@ defmodule Xamal.Commands.Hook do
   Build environment variables to pass to hook scripts.
   """
   def env(config, details \\ %{}, attrs \\ %{}) do
-    service = Xamal.Configuration.service(config)
+    service = Configuration.service(config)
     version = config.version || ""
+    hosts = Configuration.all_hosts(config)
+    host_names = Configuration.host_names(config)
 
     base = %{
       "XAMAL_SERVICE" => service,
       "XAMAL_VERSION" => version,
-      "XAMAL_HOSTS" => Xamal.Configuration.all_hosts(config) |> Enum.join(","),
+      "XAMAL_HOSTS" => Enum.join(hosts, ","),
+      "XAMAL_HOST_NAMES" => Enum.map_join(hosts, ",", &Map.get(host_names, &1, &1)),
       "XAMAL_COMMAND" => Map.get(details, :command, ""),
       "XAMAL_SUBCOMMAND" => Map.get(details, :subcommand, ""),
       "XAMAL_DESTINATION" => config.destination || "",
@@ -44,6 +49,6 @@ defmodule Xamal.Commands.Hook do
   end
 
   defp hook_file(config, hook_name) do
-    Path.join(Xamal.Configuration.hooks_path(config), hook_name)
+    Path.join(Configuration.hooks_path(config), hook_name)
   end
 end

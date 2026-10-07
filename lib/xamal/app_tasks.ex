@@ -31,12 +31,12 @@ defmodule Xamal.AppTasks do
     hosts = Context.hosts(context)
 
     Enum.each(hosts, fn host ->
-      say("  Stopping on #{host}...", :magenta)
+      say("  Stopping on #{host_label(config, host)}...", :magenta)
       cmd = Systemd.stop_all(config)
 
       case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
-        {:ok, _} -> say("  Stopped on #{host}", :green)
-        {:error, _} -> say("  App not running on #{host}", :yellow)
+        {:ok, _} -> say("  Stopped on #{host_label(config, host)}", :green)
+        {:error, _} -> say("  App not running on #{host_label(config, host)}", :yellow)
       end
     end)
   end
@@ -83,7 +83,7 @@ defmodule Xamal.AppTasks do
       cmd = Caddy.write_maintenance_caddyfile(config)
       SSH.execute_command(host, cmd, ssh_config: config.ssh)
       reload_caddy!(host, config)
-      say("  Maintenance mode enabled on #{host}", :green)
+      say("  Maintenance mode enabled on #{host_label(config, host)}", :green)
     end)
 
     run_hook("post-caddy-reload", [skip_hooks: skip_hooks], context)
@@ -100,12 +100,15 @@ defmodule Xamal.AppTasks do
 
     Enum.each(Context.hosts(context), fn host ->
       active_port = read_active_port(host, config) || config.caddy.app_port
-      say("  Starting on #{host} (port #{active_port})...", :magenta)
+      say("  Starting on #{host_label(config, host)} (port #{active_port})...", :magenta)
       cmd = Systemd.start(config, active_port)
 
       case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
-        {:ok, _} -> say("  Started on #{host} (port #{active_port})", :green)
-        {:error, reason} -> say("  Error on #{host}: #{inspect(reason)}", :red)
+        {:ok, _} ->
+          say("  Started on #{host_label(config, host)} (port #{active_port})", :green)
+
+        {:error, reason} ->
+          say("  Error on #{host_label(config, host)}: #{inspect(reason)}", :red)
       end
     end)
   end
@@ -120,8 +123,11 @@ defmodule Xamal.AppTasks do
 
     Enum.each(Context.hosts(context), fn host ->
       case SSH.execute_command(host, AppCommand.current_version(config), ssh_config: config.ssh) do
-        {:ok, output} -> puts_by_host(host, String.trim(output), type: "Version")
-        {:error, _} -> puts_by_host(host, "(unknown)", type: "Version")
+        {:ok, output} ->
+          puts_by_host(host_label(config, host), String.trim(output), type: "Version")
+
+        {:error, _} ->
+          puts_by_host(host_label(config, host), "(unknown)", type: "Version")
       end
     end)
   end
@@ -139,8 +145,8 @@ defmodule Xamal.AppTasks do
       cmd = AppCommand.stale_releases(config, keep)
 
       case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
-        {:ok, output} -> puts_by_host(host, output, type: "Stale Releases")
-        {:error, _} -> puts_by_host(host, "(none)", type: "Stale Releases")
+        {:ok, output} -> puts_by_host(host_label(config, host), output, type: "Stale Releases")
+        {:error, _} -> puts_by_host(host_label(config, host), "(none)", type: "Stale Releases")
       end
     end)
   end
@@ -190,7 +196,7 @@ defmodule Xamal.AppTasks do
       cmd = Caddy.write_caddyfile(config, active_port)
       SSH.execute_command(host, cmd, ssh_config: config.ssh)
       reload_caddy!(host, config)
-      say("  Live mode restored on #{host} (port #{active_port})", :green)
+      say("  Live mode restored on #{host_label(config, host)} (port #{active_port})", :green)
     end)
 
     run_hook("post-caddy-reload", [skip_hooks: skip_hooks], context)
@@ -216,7 +222,7 @@ defmodule Xamal.AppTasks do
     maybe_wait_before_batch(index, config.boot.wait)
 
     Enum.each(batch, fn host ->
-      say("  Booting #{role.name} on #{host}...", :magenta)
+      say("  Booting #{role.name} on #{host_label(config, host)}...", :magenta)
       do_boot_host(config, role, host, skip_hooks, context)
     end)
   end
@@ -244,7 +250,7 @@ defmodule Xamal.AppTasks do
     active_port = read_active_port(host, config)
     cmd = AppCommand.exec(config, command, interactive: true, port: active_port)
 
-    say("Connecting to #{host}...", :magenta)
+    say("Connecting to #{host_label(config, host)}...", :magenta)
     SSH.interactive_exec(host, CommandBase.to_command_string(cmd), ssh_config: config.ssh)
   end
 
@@ -253,8 +259,8 @@ defmodule Xamal.AppTasks do
     cmd = AppCommand.exec(config, command, port: active_port)
 
     case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
-      {:ok, output} -> puts_by_host(host, output)
-      {:error, reason} -> puts_by_host(host, "Error: #{inspect(reason)}")
+      {:ok, output} -> puts_by_host(host_label(config, host), output)
+      {:error, reason} -> puts_by_host(host_label(config, host), "Error: #{inspect(reason)}")
     end
   end
 
@@ -273,7 +279,7 @@ defmodule Xamal.AppTasks do
         context
       )
 
-    say("  Booted #{role.name} on #{host} (port #{new_port})", :green)
+    say("  Booted #{role.name} on #{host_label(config, host)} (port #{new_port})", :green)
   end
 
   defp current_version(host, config) do

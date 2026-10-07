@@ -122,9 +122,9 @@ defmodule Xamal.Deployment do
 
   defp rollback_role(config, role, version, context) do
     Enum.each(role.hosts, fn host ->
-      say("  Rolling back #{host} (#{role.name})...", :magenta)
+      say("  Rolling back #{host_label(config, host)} (#{role.name})...", :magenta)
       new_port = Xamal.BlueGreen.swap(host, config, version, [], context)
-      say("  Rolled back #{host} to #{version} (port #{new_port})", :green)
+      say("  Rolled back #{host_label(config, host)} to #{version} (port #{new_port})", :green)
     end)
   end
 

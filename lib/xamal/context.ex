@@ -50,8 +50,22 @@ defmodule Xamal.Context do
   def hosts(%__MODULE__{} = context) do
     context.config
     |> Configuration.all_hosts()
-    |> filter_specific_hosts(context.specific_hosts)
+    |> filter_specific_hosts(context.specific_hosts, Configuration.host_names(context.config))
     |> filter_specific_roles(context)
+  end
+
+  @doc """
+  Host filter patterns that match no configured host by address or name.
+  """
+  def unmatched_host_patterns(%__MODULE__{config: nil}, patterns), do: patterns
+
+  def unmatched_host_patterns(%__MODULE__{config: config}, patterns) do
+    hosts = Configuration.all_hosts(config)
+    names = Configuration.host_names(config)
+
+    Enum.reject(patterns, fn pattern ->
+      Enum.any?(hosts, &host_matches?(&1, names, [pattern]))
+    end)
   end
 
   def primary_host(%__MODULE__{config: nil}), do: nil
@@ -65,10 +79,18 @@ defmodule Xamal.Context do
     Enum.filter(config.roles, fn role -> matches_any?(role.name, specific_roles) end)
   end
 
-  defp filter_specific_hosts(hosts, nil), do: hosts
+  defp filter_specific_hosts(hosts, nil, _names), do: hosts
 
-  defp filter_specific_hosts(hosts, specific_hosts) do
-    Enum.filter(hosts, fn host -> matches_any?(host, specific_hosts) end)
+  defp filter_specific_hosts(hosts, specific_hosts, names) do
+    Enum.filter(hosts, &host_matches?(&1, names, specific_hosts))
+  end
+
+  defp host_matches?(host, names, patterns) do
+    matches_any?(host, patterns) or
+      case Map.get(names, host) do
+        nil -> false
+        name -> matches_any?(name, patterns)
+      end
   end
 
   defp filter_specific_roles(hosts, %{specific_roles: nil}), do: hosts

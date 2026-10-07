@@ -30,11 +30,14 @@ defmodule Xamal.BlueGreen do
     case ssh_exec(host, Systemd.sync_unit(config), config) do
       {:ok, output} ->
         if output =~ "unit-updated" do
-          say("  Updated systemd unit #{config.release.name}@.service on #{host}", :yellow)
+          say(
+            "  Updated systemd unit #{config.release.name}@.service on #{host_label(config, host)}",
+            :yellow
+          )
         end
 
       {:error, reason} ->
-        raise "Failed to update the systemd unit on #{host}: #{inspect(reason)}"
+        raise "Failed to update the systemd unit on #{host_label(config, host)}: #{inspect(reason)}"
     end
   end
 
@@ -66,11 +69,11 @@ defmodule Xamal.BlueGreen do
       end)
 
     """
-    #{host} runs this app under a different release name (#{Enum.join(old_names, ", ")}), \
+    #{host_label(config, host)} runs this app under a different release name (#{Enum.join(old_names, ", ")}), \
     but release.name is now #{inspect(config.release.name)}.
 
     Deploying would leave the old service running on its port and enabled on \
-    reboot. Renaming a release is a migration: on #{host}, stop and remove the \
+    reboot. Renaming a release is a migration: on #{host_label(config, host)}, stop and remove the \
     old units, then bootstrap and deploy under the new name.
 
     #{cleanup}
@@ -107,16 +110,16 @@ defmodule Xamal.BlueGreen do
            timeout: health_check.timeout
          ) do
       :ok ->
-        say("  Health check passed on #{host}:#{new_port}", :green)
+        say("  Health check passed on #{host_label(config, host)} (port #{new_port})", :green)
 
       {:error, :timeout} ->
         rollback_failed_boot(host, config, new_port, rollback_version)
-        raise "Health check failed for #{host} after #{health_check.timeout}s"
+        raise "Health check failed for #{host_label(config, host)} after #{health_check.timeout}s"
     end
   end
 
   defp rollback_failed_boot(host, config, new_port, rollback_version) do
-    say("  Health check timed out on #{host}:#{new_port}!", :red)
+    say("  Health check timed out on #{host_label(config, host)} (port #{new_port})!", :red)
     ssh_exec(host, Systemd.stop(config, new_port), config)
 
     if rollback_version do

@@ -4,9 +4,13 @@ defmodule Xamal.Configuration.Role do
 
   Each role has a name, a list of hosts, optional cmd override,
   and optional env overrides.
+
+  A host entry is either a bare address (`"10.0.0.1"`) or a single
+  `%{name => address}` map. `hosts` always holds addresses; `host_names`
+  maps an address to its name for hosts that have one.
   """
 
-  defstruct [:name, :hosts, :cmd, :env, :tags, :config]
+  defstruct [:name, :hosts, :cmd, :env, :tags, :config, host_names: %{}]
 
   alias Xamal.Configuration.Env
 
@@ -14,7 +18,8 @@ defmodule Xamal.Configuration.Role do
   Create a role from the servers config entry.
   """
   def new(name, role_config, raw_config, secrets) do
-    {hosts, specializations} = parse_role_config(role_config)
+    {entries, specializations} = parse_role_config(role_config)
+    {hosts, host_names} = parse_hosts(name, entries)
 
     specialized_env =
       case Map.get(specializations, "env") do
@@ -25,6 +30,7 @@ defmodule Xamal.Configuration.Role do
     %__MODULE__{
       name: name,
       hosts: hosts,
+      host_names: host_names,
       cmd: Map.get(specializations, "cmd"),
       env: specialized_env,
       tags: Map.get(specializations, "tags", []),
@@ -59,7 +65,7 @@ defmodule Xamal.Configuration.Role do
     hosts =
       case Map.get(config, "hosts") do
         nil -> []
-        hosts when is_list(hosts) -> parse_hosts(hosts)
+        hosts when is_list(hosts) -> hosts
       end
 
     specializations = Map.drop(config, ["hosts"])
@@ -68,10 +74,42 @@ defmodule Xamal.Configuration.Role do
 
   defp parse_role_config(_), do: {[], %{}}
 
-  defp parse_hosts(hosts) do
-    Enum.map(hosts, fn
-      host when is_binary(host) -> host
-      host when is_map(host) -> host |> Map.keys() |> hd()
+  defp parse_hosts(role_name, entries) do
+    entries
+    |> Enum.flat_map(&host_entry(role_name, &1))
+    |> Enum.reduce({[], %{}}, fn
+      {nil, address}, {hosts, names} ->
+        {[address | hosts], names}
+
+      {name, address}, {hosts, names} ->
+        case Map.fetch(names, address) do
+          {:ok, existing} when existing != name ->
+            raise ArgumentError,
+                  "Host #{address} has more than one name: #{existing}, #{name}"
+
+          _ ->
+            {[address | hosts], Map.put(names, address, name)}
+        end
     end)
+    |> then(fn {hosts, names} -> {Enum.reverse(hosts), names} end)
+  end
+
+  defp host_entry(_role_name, address) when is_binary(address), do: [{nil, address}]
+
+  defp host_entry(role_name, entry) when is_map(entry) do
+    entry
+    |> Enum.sort()
+    |> Enum.map(fn
+      {name, address} when is_binary(address) ->
+        {to_string(name), address}
+
+      {name, value} ->
+        raise ArgumentError,
+              "Host #{inspect(to_string(name))} in role #{role_name} must map to an address string, got: #{inspect(value)}"
+    end)
+  end
+
+  defp host_entry(role_name, entry) do
+    raise ArgumentError, "Invalid host in role #{role_name}: #{inspect(entry)}"
   end
 end

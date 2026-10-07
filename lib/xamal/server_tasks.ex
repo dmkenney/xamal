@@ -23,8 +23,11 @@ defmodule Xamal.ServerTasks do
   defp exec_on_hosts(command, config, hosts) do
     Enum.each(hosts, fn host ->
       case SSH.execute(host, command, ssh_config: config.ssh) do
-        {:ok, output} -> puts_by_host(host, output, type: "Server")
-        {:error, reason} -> puts_by_host(host, "Error: #{inspect(reason)}", type: "Server")
+        {:ok, output} ->
+          puts_by_host(host_label(config, host), output, type: "Server")
+
+        {:error, reason} ->
+          puts_by_host(host_label(config, host), "Error: #{inspect(reason)}", type: "Server")
       end
     end)
   end
@@ -36,15 +39,15 @@ defmodule Xamal.ServerTasks do
     say("Bootstrapping #{length(hosts)} server(s)...", :magenta)
 
     Enum.each(hosts, fn host ->
-      say("  Bootstrapping #{host}...", :magenta)
+      say("  Bootstrapping #{host_label(config, host)}...", :magenta)
 
       # Check if Caddy is installed
       case SSH.execute_command(host, Caddy.check_installed(), ssh_config: config.ssh) do
         {:ok, _} ->
-          say("  Caddy already installed on #{host}", :green)
+          say("  Caddy already installed on #{host_label(config, host)}", :green)
 
         {:error, _} ->
-          say("  Installing Caddy on #{host}...", :magenta)
+          say("  Installing Caddy on #{host_label(config, host)}...", :magenta)
           install_cmd = Caddy.install()
           SSH.execute_command(host, install_cmd, ssh_config: config.ssh, timeout: 120_000)
       end
@@ -58,7 +61,7 @@ defmodule Xamal.ServerTasks do
       SSH.execute_command(host, bootstrap_cmd, ssh_config: config.ssh)
 
       # Install systemd service unit
-      say("  Installing systemd service unit on #{host}...", :magenta)
+      say("  Installing systemd service unit on #{host_label(config, host)}...", :magenta)
 
       SSH.execute_command(host, Systemd.install_unit(config), ssh_config: config.ssh)
 
@@ -82,7 +85,7 @@ defmodule Xamal.ServerTasks do
       SSH.execute_command(host, Caddy.enable(), ssh_config: config.ssh)
       reload_caddy!(host, config)
 
-      say("  Bootstrapped #{host}", :green)
+      say("  Bootstrapped #{host_label(config, host)}", :green)
     end)
   end
 
@@ -99,13 +102,13 @@ defmodule Xamal.ServerTasks do
     ports = "#{config.caddy.app_port}/#{Configuration.Caddy.alt_port(config.caddy)}"
 
     port_message =
-      "another app on #{host} already uses ports #{ports}. Set caddy.app_port " <>
+      "another app on #{host_label(config, host)} already uses ports #{ports}. Set caddy.app_port " <>
         "so this app's two ports (app_port and app_port + 1) are free."
 
     checks =
       [
         {Systemd.unit_owned_by_other_service(config),
-         "another app on #{host} already uses the release name #{inspect(release)} " <>
+         "another app on #{host_label(config, host)} already uses the release name #{inspect(release)} " <>
            "(systemd unit #{release}@.service). Set a different release.name."},
         # Ports recorded by other apps' bootstrap, then running units (covers
         # apps bootstrapped before the ports file existed).
@@ -126,7 +129,7 @@ defmodule Xamal.ServerTasks do
     if Configuration.Caddy.hostnames(config.caddy) == [] do
       [
         {Caddy.catch_all_conflicts(config),
-         "another app on #{host} already serves every hostname on :80 (it has no " <>
+         "another app on #{host_label(config, host)} already serves every hostname on :80 (it has no " <>
            "caddy.host). Set caddy.host for this app."}
       ]
     else

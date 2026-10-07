@@ -6,6 +6,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Named hosts. A host in `servers` can be `name: address`, e.g.
+  `web: [east: "10.0.0.1", west: "10.0.0.2"]`. Bare addresses still work and
+  the two can be mixed. `-h` matches names or addresses (wildcards included),
+  output labels named hosts as `east (10.0.0.1)`, and hooks get
+  `XAMAL_HOST_NAMES` alongside the unchanged `XAMAL_HOSTS`. SSH, locks, the
+  audit log, and server state still use the address. A name used for two
+  addresses, or an address given two names, fails config validation.
+
+### Changed
+
+- `-h`/`--hosts` now fails when a pattern matches no configured host, instead
+  of running on nothing.
+- A single-entry map in a host list (`%{"name" => "address"}`) is now read as
+  a named host. It was previously read as `%{"address" => tag}` with the
+  value ignored.
+
 ## [0.6.0]
 
 ### Added

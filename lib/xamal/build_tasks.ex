@@ -249,7 +249,7 @@ defmodule Xamal.BuildTasks do
     end
 
     Enum.each(hosts, fn host ->
-      say("  Uploading to #{host}...", :magenta)
+      say("  Uploading to #{host_label(config, host)}...", :magenta)
 
       version = config.version
       remote_dir = "#{Configuration.releases_directory(config)}/#{version}"
@@ -266,10 +266,10 @@ defmodule Xamal.BuildTasks do
           # Unpack on remote
           unpack_cmd = Builder.unpack_tarball(config)
           SSH.execute_command(host, unpack_cmd, ssh_config: config.ssh)
-          say("  Deployed to #{host}", :green)
+          say("  Deployed to #{host_label(config, host)}", :green)
 
         {:error, reason} ->
-          raise "Failed to upload to #{host}: #{inspect(reason)}"
+          raise "Failed to upload to #{host_label(config, host)}: #{inspect(reason)}"
       end
     end)
   end
