@@ -80,7 +80,7 @@ import Config
 config :xamal,
   service: "my-app",
   servers: [
-    web: ["192.168.0.1", "192.168.0.2"],
+    web: [east: "192.168.0.1", west: "192.168.0.2"],
     worker: [
       hosts: ["192.168.0.3"],
       cmd: ~s(bin/my_app eval "Worker.start()")
@@ -107,6 +107,10 @@ config :xamal,
     path: "/health"
   ]
 ```
+
+Hosts can be bare addresses or `name: address`. Names are labels for output
+and targeting (`mix xamal.app.exec -h east ...`); SSH always connects to the
+address.
 
 **Important:** The `release.name` must match a named release in your `mix.exs`. Xamal runs `mix release <name>`, which requires an explicit release definition:
 

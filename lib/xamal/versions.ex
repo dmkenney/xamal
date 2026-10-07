@@ -15,7 +15,7 @@ defmodule Xamal.Versions do
   end
 
   defp print_versions(host, config) do
-    say("Host: #{host}", :magenta)
+    say("Host: #{host_label(config, host)}", :magenta)
     host_versions = host_releases(host, config)
     current = host_current_version(host, config)
     Enum.each(version_lines(host_versions, current), &IO.puts/1)

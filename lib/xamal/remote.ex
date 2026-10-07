@@ -62,10 +62,10 @@ defmodule Xamal.Remote do
         :ok
 
       {:error, {:exit_status, _, output}} ->
-        raise "Caddy rejected the reload on #{host}; the previous config is still live:\n#{output}"
+        raise "Caddy rejected the reload on #{Xamal.Configuration.host_label(config, host)}; the previous config is still live:\n#{output}"
 
       {:error, reason} ->
-        raise "Caddy reload failed on #{host}: #{inspect(reason)}"
+        raise "Caddy reload failed on #{Xamal.Configuration.host_label(config, host)}: #{inspect(reason)}"
     end
   end
 

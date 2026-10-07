@@ -14,7 +14,7 @@ defmodule Xamal.Details do
     config = context.config
 
     Enum.each(Context.hosts(context), fn host ->
-      say("Host: #{host}", :magenta)
+      say("Host: #{host_label(config, host)}", :magenta)
       print_host_details(host, config)
       IO.puts("")
     end)

@@ -14,8 +14,8 @@ defmodule Xamal.Audit do
 
     Enum.each(Context.hosts(context), fn host ->
       case SSH.execute_command(host, Auditor.reveal(config), ssh_config: config.ssh) do
-        {:ok, output} -> puts_by_host(host, output)
-        {:error, _} -> puts_by_host(host, "(no audit log)")
+        {:ok, output} -> puts_by_host(host_label(config, host), output)
+        {:error, _} -> puts_by_host(host_label(config, host), "(no audit log)")
       end
     end)
   end

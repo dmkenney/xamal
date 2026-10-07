@@ -35,8 +35,8 @@ defmodule Xamal.Logs do
     cmd = build_cmd.(log_opts)
 
     case SSH.execute_command(host, cmd, ssh_config: config.ssh) do
-      {:ok, output} -> puts_by_host(host, output, type: type)
-      {:error, _} -> puts_by_host(host, "(no logs available)", type: type)
+      {:ok, output} -> puts_by_host(host_label(config, host), output, type: type)
+      {:error, _} -> puts_by_host(host_label(config, host), "(no logs available)", type: type)
     end
   end
 end

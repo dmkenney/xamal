@@ -13,7 +13,9 @@ defmodule Xamal.ConfigPrinter do
     IO.puts("Roles:")
 
     Enum.each(config.roles, fn role ->
-      IO.puts("  #{role.name}: #{Enum.join(role.hosts, ", ")}")
+      IO.puts(
+        "  #{role.name}: #{Enum.map_join(role.hosts, ", ", &Configuration.host_label(config, &1))}"
+      )
     end)
 
     IO.puts("")

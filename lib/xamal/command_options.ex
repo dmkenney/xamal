@@ -22,10 +22,29 @@ defmodule Xamal.CommandOptions do
 
   defp put_host_filter(context, opts) do
     if hosts = Keyword.get(opts, :hosts) do
-      Context.put_specific_hosts(context, String.split(hosts, ","))
+      patterns = String.split(hosts, ",", trim: true)
+
+      if patterns == [], do: Mix.raise("--hosts needs at least one host name or address")
+
+      case Context.unmatched_host_patterns(context, patterns) do
+        [] ->
+          Context.put_specific_hosts(context, patterns)
+
+        unmatched ->
+          Mix.raise(
+            "No configured host matches #{Enum.map_join(unmatched, ", ", &inspect/1)} " <>
+              "(known hosts: #{known_hosts(context.config)})"
+          )
+      end
     else
       context
     end
+  end
+
+  defp known_hosts(config) do
+    config
+    |> Configuration.all_hosts()
+    |> Enum.map_join(", ", &Configuration.host_label(config, &1))
   end
 
   defp put_role_filter(context, opts) do

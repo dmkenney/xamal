@@ -9,6 +9,8 @@ defmodule Xamal.Output do
     |> IO.puts()
   end
 
+  defdelegate host_label(config, host), to: Xamal.Configuration
+
   def puts_by_host(host, output, opts \\ []) do
     type = Keyword.get(opts, :type, "App")
     quiet = Keyword.get(opts, :quiet, false)
