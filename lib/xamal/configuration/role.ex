@@ -78,8 +78,18 @@ defmodule Xamal.Configuration.Role do
     entries
     |> Enum.flat_map(&host_entry(role_name, &1))
     |> Enum.reduce({[], %{}}, fn
-      {nil, address}, {hosts, names} -> {[address | hosts], names}
-      {name, address}, {hosts, names} -> {[address | hosts], Map.put(names, address, name)}
+      {nil, address}, {hosts, names} ->
+        {[address | hosts], names}
+
+      {name, address}, {hosts, names} ->
+        case Map.fetch(names, address) do
+          {:ok, existing} when existing != name ->
+            raise ArgumentError,
+                  "Host #{address} has more than one name: #{existing}, #{name}"
+
+          _ ->
+            {[address | hosts], Map.put(names, address, name)}
+        end
     end)
     |> then(fn {hosts, names} -> {Enum.reverse(hosts), names} end)
   end

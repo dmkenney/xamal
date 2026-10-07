@@ -62,6 +62,19 @@ defmodule Xamal.HostNamesTest do
       assert Configuration.host_name(config, "10.0.0.5") == "jobs"
     end
 
+    test "named hosts in a map-based role", %{tmp_dir: dir} do
+      config =
+        write_config(
+          dir,
+          ~s([web: %{hosts: [west: "10.0.0.2", east: "10.0.0.1"], cmd: "bin/web"}])
+        )
+
+      web = Configuration.role(config, "web")
+      assert web.hosts == ["10.0.0.2", "10.0.0.1"]
+      assert web.cmd == "bin/web"
+      assert Configuration.host_name(config, "10.0.0.1") == "east"
+    end
+
     test "implicit web role from a plain list", %{tmp_dir: dir} do
       config = write_config(dir, ~s(["10.0.0.1", east: "10.0.0.2"]))
 
@@ -80,6 +93,12 @@ defmodule Xamal.HostNamesTest do
     test "rejects an address with two names" do
       assert_raise ArgumentError, ~r/Host 10.0.0.1 has more than one name/, fn ->
         new_config(%{"web" => [%{"east" => "10.0.0.1"}], "job" => [%{"west" => "10.0.0.1"}]})
+      end
+    end
+
+    test "rejects an address with two names in one role", %{tmp_dir: dir} do
+      assert_raise ArgumentError, ~r/Host 10.0.0.1 has more than one name: east, west/, fn ->
+        write_config(dir, ~s([web: [east: "10.0.0.1", west: "10.0.0.1"]]))
       end
     end
 

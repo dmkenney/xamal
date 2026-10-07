@@ -366,16 +366,24 @@ defmodule Xamal.Configuration do
 
   defp normalize_role(role) when is_list(role) do
     if Keyword.has_key?(role, :hosts) do
-      Map.new(role, fn
-        {:hosts, hosts} -> {"hosts", normalize_hosts(hosts)}
-        {key, value} -> {normalize_key(key), normalize_config(value)}
-      end)
+      normalize_role_options(role)
     else
       normalize_hosts(role)
     end
   end
 
+  defp normalize_role(role) when is_map(role), do: normalize_role_options(role)
+
   defp normalize_role(role), do: normalize_config(role)
+
+  defp normalize_role_options(role) do
+    Map.new(role, fn {key, value} ->
+      case normalize_key(key) do
+        "hosts" -> {"hosts", normalize_hosts(value)}
+        key -> {key, normalize_config(value)}
+      end
+    end)
+  end
 
   defp normalize_hosts(hosts) when is_list(hosts) do
     Enum.map(hosts, fn
