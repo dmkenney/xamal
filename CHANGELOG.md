@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0]
+
 ### Added
 
 - Named hosts. A host in `servers` can be `name: address`, e.g.
@@ -226,6 +228,7 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.7.0]: https://github.com/dmkenney/xamal/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dmkenney/xamal/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dmkenney/xamal/releases/tag/v0.5.0
 [0.4.2]: https://github.com/dmkenney/xamal/releases/tag/v0.4.2
