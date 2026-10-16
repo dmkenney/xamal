@@ -1,9 +1,11 @@
 defmodule Xamal.SSH.KeyProvider do
   @moduledoc """
-  Custom SSH key callback that serves key data from memory.
+  Custom SSH key callback that serves a single configured private key.
 
-  Used when `key_data` is set in SSH config, allowing keys to be
-  provided without writing them to disk (e.g. fetched from 1Password via `op read`).
+  Takes `key_file: path` (the key from `ssh.keys`, read on use) or
+  `key_data: fun` (a zero-arity function returning the PEM, for `ssh.key_data`
+  fetched from e.g. 1Password via `op read`). The key is never passed by value
+  so it cannot appear in exit reasons or crash reports that print the options.
   """
 
   @behaviour :ssh_client_key_api
@@ -20,11 +22,19 @@ defmodule Xamal.SSH.KeyProvider do
 
   @impl true
   def user_key(algorithm, opts) do
-    key_data = opts[:key_cb_private][:key_data]
+    with {:ok, key_data} <- read_key(opts[:key_cb_private] || []) do
+      case decode_pem_key(key_data, algorithm) do
+        {:ok, key} -> {:ok, key}
+        :none -> {:error, :no_matching_key}
+      end
+    end
+  end
 
-    case decode_pem_key(key_data, algorithm) do
-      {:ok, key} -> {:ok, key}
-      :none -> {:error, :no_matching_key}
+  defp read_key(private) do
+    cond do
+      path = private[:key_file] -> File.read(path)
+      is_function(private[:key_data], 0) -> {:ok, private[:key_data].()}
+      true -> {:ok, private[:key_data]}
     end
   end
 

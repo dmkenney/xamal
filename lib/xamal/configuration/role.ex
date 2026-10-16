@@ -10,6 +10,8 @@ defmodule Xamal.Configuration.Role do
   maps an address to its name for hosts that have one.
   """
 
+  # config is the raw config, which can hold ssh.key_data.
+  @derive {Inspect, except: [:config]}
   defstruct [:name, :hosts, :cmd, :env, :tags, :config, host_names: %{}]
 
   alias Xamal.Configuration.Env

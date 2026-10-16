@@ -20,7 +20,18 @@ defmodule Xamal.SSH.ConnectionPool do
 
   def checkout(host, port, user, connect_opts \\ []) do
     GenServer.call(__MODULE__, {:checkout, host, port, user, connect_opts}, 30_000)
+  catch
+    # Never let the exit propagate: its reason includes the call arguments,
+    # and with them the SSH connect options.
+    :exit, reason -> {:error, {:ssh_connection_failed, host, port, exit_reason(reason)}}
   end
+
+  defp exit_reason({:timeout, _}), do: :timeout
+
+  defp exit_reason({:noproc, _}),
+    do: "Xamal's SSH connection pool is not running; rerun the task"
+
+  defp exit_reason(_), do: "Xamal's SSH connection pool crashed"
 
   def checkin(host, port, user) do
     GenServer.cast(__MODULE__, {:checkin, host, port, user})
@@ -70,6 +81,13 @@ defmodule Xamal.SSH.ConnectionPool do
 
     {:reply, :ok, %{state | connections: %{}}}
   end
+
+  # Keep connect options out of crash reports.
+  @impl true
+  def format_status(%{message: {:checkout, host, port, user, _opts}} = status),
+    do: %{status | message: {:checkout, host, port, user, :redacted}}
+
+  def format_status(status), do: status
 
   @impl true
   def handle_cast({:checkin, host, port, user}, state) do

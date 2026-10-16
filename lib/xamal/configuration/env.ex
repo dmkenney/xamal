@@ -9,6 +9,7 @@ defmodule Xamal.Configuration.Env do
   # Vars managed by systemd template units — must not appear in the env file.
   @reserved_vars ["PORT"]
 
+  @derive {Inspect, except: [:secrets]}
   defstruct [:clear, :secret_keys, :secrets]
 
   def new(config, secrets) when is_map(config) do
