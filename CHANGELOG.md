@@ -6,6 +6,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.1]
+
+### Fixed
+
+- The SSH private key could be printed in task output. When the connection
+  pool was not running or crashed, the exit message included the connect
+  options, which held the full key from `ssh.key_data` or the file in
+  `ssh.keys`. The key is now passed by file path or wrapped in a function, so
+  it never appears in exit messages or crash reports. If you saw a key in
+  Xamal output, rotate it.
+- Pool failures now return a normal SSH connection error (for example "Xamal's
+  SSH connection pool is not running; rerun the task") instead of raising.
+  This also covers interactive and streaming commands.
+- Mix tasks now stop with a clear error if the `:xamal` application fails to
+  start.
+- Config, role, env, and secrets structs no longer show secret values or the
+  raw config when inspected.
+
 ## [0.7.0]
 
 ### Added
@@ -228,6 +246,7 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.7.1]: https://github.com/dmkenney/xamal/releases/tag/v0.7.1
 [0.7.0]: https://github.com/dmkenney/xamal/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dmkenney/xamal/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dmkenney/xamal/releases/tag/v0.5.0
