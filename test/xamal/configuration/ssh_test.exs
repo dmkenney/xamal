@@ -46,6 +46,11 @@ defmodule Xamal.Configuration.SshTest do
     end
   end
 
+  test "inspect hides key_data" do
+    ssh = Ssh.new(%{"key_data" => "-----BEGIN PRIVATE KEY-----\nsecret\n"})
+    refute inspect(ssh) =~ "PRIVATE KEY"
+  end
+
   describe "connect_options/1" do
     test "includes basic options" do
       ssh = Ssh.new(%{"user" => "deploy"})
@@ -63,10 +68,21 @@ defmodule Xamal.Configuration.SshTest do
 
       opts = Ssh.connect_options(Ssh.new(%{"keys" => [path]}))
 
-      assert Keyword.get(opts, :key_cb) ==
-               {Xamal.SSH.KeyProvider, key_data: "key contents"}
+      assert Keyword.get(opts, :key_cb) == {Xamal.SSH.KeyProvider, key_file: path}
 
       refute Keyword.has_key?(opts, :user_dir)
+    end
+
+    test "never carries the key itself in the options", %{} do
+      path = Path.join(System.tmp_dir!(), "deploy_key_#{System.unique_integer([:positive])}")
+      File.write!(path, "-----BEGIN PRIVATE KEY-----\nsecret\n")
+      on_exit(fn -> File.rm(path) end)
+
+      for config <- [%{"keys" => [path]}, %{"key_data" => File.read!(path)}] do
+        opts = Ssh.connect_options(Ssh.new(config))
+        refute inspect(opts) =~ "PRIVATE KEY"
+        refute :io_lib.format(~c"~p", [opts]) |> to_string() =~ "PRIVATE KEY"
+      end
     end
 
     test "uses :ssh defaults when no configured key exists on disk" do

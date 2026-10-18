@@ -35,6 +35,27 @@ defmodule Xamal.SSH.KeyProviderTest do
              {:error, :no_matching_key}
   end
 
+  test "reads the key from a file path", %{tmp_dir: dir} do
+    generate_key(dir, "ed25519")
+    path = Path.join(dir, "key_ed25519")
+
+    assert {:ok, _key} = KeyProvider.user_key(:"ssh-ed25519", key_cb_private: [key_file: path])
+  end
+
+  test "reads the key from a function", %{tmp_dir: dir} do
+    key_data = generate_key(dir, "ecdsa")
+
+    assert {:ok, _key} =
+             KeyProvider.user_key(:"ecdsa-sha2-nistp256",
+               key_cb_private: [key_data: fn -> key_data end]
+             )
+  end
+
+  test "reports a missing key file" do
+    assert KeyProvider.user_key(:"ssh-ed25519", key_cb_private: [key_file: "/nonexistent/key"]) ==
+             {:error, :enoent}
+  end
+
   test "reports no key for unreadable data" do
     assert KeyProvider.user_key(:"ssh-ed25519", key_cb_private: [key_data: "not a key"]) ==
              {:error, :no_matching_key}

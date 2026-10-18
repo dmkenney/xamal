@@ -6,6 +6,8 @@ defmodule Xamal.Configuration do
   sub-configurations.
   """
 
+  # raw_config can hold ssh.key_data; the parsed structs redact their secrets.
+  @derive {Inspect, except: [:raw_config]}
   defstruct [
     :raw_config,
     :service,

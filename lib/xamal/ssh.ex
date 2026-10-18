@@ -54,17 +54,12 @@ defmodule Xamal.SSH do
     port = Host.port(host, ssh_config)
 
     checkout_result =
-      try do
-        ConnectionPool.checkout(
-          hostname,
-          port,
-          ssh_config.user,
-          Ssh.connect_options(ssh_config)
-        )
-      catch
-        :exit, {:timeout, _} ->
-          {:error, {:ssh_connection_failed, hostname, port, :timeout}}
-      end
+      ConnectionPool.checkout(
+        hostname,
+        port,
+        ssh_config.user,
+        Ssh.connect_options(ssh_config)
+      )
 
     with {:ok, conn} <- checkout_result do
       try do
@@ -111,17 +106,12 @@ defmodule Xamal.SSH do
 
   defp upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path) do
     checkout_result =
-      try do
-        ConnectionPool.checkout(
-          hostname,
-          port,
-          ssh_config.user,
-          Ssh.connect_options(ssh_config)
-        )
-      catch
-        :exit, {:timeout, _} ->
-          {:error, {:ssh_connection_failed, hostname, port, :timeout}}
-      end
+      ConnectionPool.checkout(
+        hostname,
+        port,
+        ssh_config.user,
+        Ssh.connect_options(ssh_config)
+      )
 
     with {:ok, conn} <- checkout_result do
       try do
@@ -187,17 +177,12 @@ defmodule Xamal.SSH do
 
   defp download_via_sftp_pooled(ssh_config, hostname, port, remote_path, local_path) do
     checkout_result =
-      try do
-        ConnectionPool.checkout(
-          hostname,
-          port,
-          ssh_config.user,
-          Ssh.connect_options(ssh_config)
-        )
-      catch
-        :exit, {:timeout, _} ->
-          {:error, {:ssh_connection_failed, hostname, port, :timeout}}
-      end
+      ConnectionPool.checkout(
+        hostname,
+        port,
+        ssh_config.user,
+        Ssh.connect_options(ssh_config)
+      )
 
     with {:ok, conn} <- checkout_result do
       try do

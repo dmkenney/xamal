@@ -57,7 +57,10 @@ defmodule Xamal.MixTask do
   end
 
   def run(args, callback) when is_function(callback) do
-    Application.ensure_all_started(:xamal)
+    case Application.ensure_all_started(:xamal) do
+      {:ok, _} -> :ok
+      {:error, reason} -> Mix.raise("Could not start Xamal: #{inspect(reason)}")
+    end
 
     {opts, rest} = parse_global_options(args)
     context = opts |> load_config!() |> build_context(opts)
