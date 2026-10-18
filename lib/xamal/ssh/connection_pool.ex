@@ -82,8 +82,9 @@ defmodule Xamal.SSH.ConnectionPool do
     {:reply, :ok, %{state | connections: %{}}}
   end
 
-  # Keep connect options out of crash reports.
-  @impl true
+  # Keep connect options out of crash reports. Elixir declares the
+  # format_status/1 callback only from 1.17; OTP calls it either way.
+  @impl {:format_status, 1} in GenServer.behaviour_info(:callbacks)
   def format_status(%{message: {:checkout, host, port, user, _opts}} = status),
     do: %{status | message: {:checkout, host, port, user, :redacted}}
 
