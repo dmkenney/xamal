@@ -251,7 +251,14 @@ defmodule Xamal.AppTasks do
     cmd = AppCommand.exec(config, command, interactive: true, port: active_port)
 
     say("Connecting to #{host_label(config, host)}...", :magenta)
-    SSH.interactive_exec(host, CommandBase.to_command_string(cmd), ssh_config: config.ssh)
+
+    case SSH.interactive_exec(host, CommandBase.to_command_string(cmd), ssh_config: config.ssh) do
+      {:error, reason} ->
+        Mix.raise("Interactive command failed on #{host_label(config, host)}: #{inspect(reason)}")
+
+      result ->
+        result
+    end
   end
 
   defp remote_exec(host, config, command) do

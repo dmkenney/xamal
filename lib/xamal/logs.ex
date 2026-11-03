@@ -27,7 +27,13 @@ defmodule Xamal.Logs do
   end
 
   defp stream_logs(host, cmd, config) do
-    SSH.streaming_exec(host, Base.to_command_string(cmd), ssh_config: config.ssh)
+    case SSH.streaming_exec(host, Base.to_command_string(cmd), ssh_config: config.ssh) do
+      {:error, reason} ->
+        Mix.raise("Log stream failed on #{host_label(config, host)}: #{inspect(reason)}")
+
+      result ->
+        result
+    end
   end
 
   defp print_logs(host, build_cmd, log_opts, config, opts) do

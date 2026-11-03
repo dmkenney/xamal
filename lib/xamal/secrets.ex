@@ -10,6 +10,7 @@ defmodule Xamal.Secrets do
   Command substitutions are executed in parallel for performance.
   """
 
+  @derive {Inspect, except: [:secrets]}
   defstruct [:destination, :secrets_path, :secrets, :files]
 
   def new(opts \\ []) do

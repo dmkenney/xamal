@@ -25,6 +25,12 @@ defmodule Xamal.Configuration.Validator do
   defp validate_service!(config) do
     service = Configuration.service(config)
 
+    # Don't let a missing key raise KeyError: its message prints the raw
+    # config, which can hold ssh.key_data.
+    unless is_binary(service) do
+      raise ArgumentError, "Missing service name. Set `service:` in config/xamal.exs"
+    end
+
     unless Regex.match?(~r/^[a-z0-9_-]+$/i, service) do
       raise ArgumentError,
             "Service name can only include alphanumeric characters, hyphens, and underscores"

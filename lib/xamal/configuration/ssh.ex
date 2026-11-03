@@ -3,6 +3,8 @@ defmodule Xamal.Configuration.Ssh do
   SSH connection configuration.
   """
 
+  # key_data is a private key; keep it out of inspect output.
+  @derive {Inspect, except: [:key_data]}
   defstruct user: "root",
             port: 22,
             proxy: nil,
@@ -52,8 +54,11 @@ defmodule Xamal.Configuration.Ssh do
     |> Keyword.put(:connect_timeout, ssh.connect_timeout)
   end
 
+  # The key never goes into the options by value: they travel through
+  # GenServer calls and :ssh, and exit reasons and crash reports print them.
+  # A closure prints as #Function<...> in both Elixir and Erlang formatting.
   defp put_key_options(opts, %{key_data: key_data}) when not is_nil(key_data) do
-    opts ++ [key_cb: {Xamal.SSH.KeyProvider, key_data: key_data}]
+    opts ++ [key_cb: {Xamal.SSH.KeyProvider, key_data: fn -> key_data end}]
   end
 
   # Load the configured key file itself. Pointing :ssh at the key's directory
@@ -61,7 +66,7 @@ defmodule Xamal.Configuration.Ssh do
   # deploy_key was silently ignored.
   defp put_key_options(opts, %{keys: keys} = ssh) when is_list(keys) do
     case key_file(ssh) do
-      {:ok, path} -> opts ++ [key_cb: {Xamal.SSH.KeyProvider, key_data: File.read!(path)}]
+      {:ok, path} -> opts ++ [key_cb: {Xamal.SSH.KeyProvider, key_file: path}]
       :none -> opts
     end
   end

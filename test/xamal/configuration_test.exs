@@ -109,6 +109,17 @@ defmodule Xamal.ConfigurationTest do
       end
     end
 
+    test "a missing service name raises without printing the config" do
+      config =
+        @valid_config
+        |> Map.delete("service")
+        |> put_in(["ssh", "key_data"], "-----BEGIN PRIVATE KEY-----\nsecret\n")
+
+      error = assert_raise ArgumentError, fn -> Configuration.new(config) end
+      assert error.message =~ "Missing service name"
+      refute Exception.message(error) =~ "PRIVATE KEY"
+    end
+
     test "rejects empty servers" do
       bad_config = Map.put(@valid_config, "servers", nil)
 
