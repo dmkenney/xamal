@@ -151,9 +151,12 @@ defmodule Xamal.Secrets do
     Regex.replace(~r/\$\(([^)]+)\)/, value, fn _full, cmd ->
       cmd = String.trim(cmd)
 
-      case System.cmd("sh", ["-c", cmd], stderr_to_stdout: true) do
+      # stdout is the secret, so it stays out of the error. stderr is not
+      # captured: it goes to the terminal, where the tool's own error shows,
+      # and it can't end up in the secret value.
+      case System.cmd("sh", ["-c", cmd]) do
         {output, 0} -> String.trim(output)
-        {error, _} -> raise "Command substitution failed for '#{cmd}': #{error}"
+        {_output, status} -> raise "Command substitution failed for '#{cmd}' (exit #{status})"
       end
     end)
   end
