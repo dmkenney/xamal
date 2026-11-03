@@ -26,16 +26,12 @@ defmodule Xamal.EnvFileTest do
       assert EnvFile.encode(%{}) == "\n"
     end
 
-    test "escapes backslash, double quote, dollar, and backtick" do
-      assert EnvFile.encode(%{"K" => ~S(\ " $ `)}) == ~S(K="\\ \" \$ \`") <> "\n"
+    test "escapes only backslash and double quote" do
+      assert EnvFile.encode(%{"K" => ~S(\ " $ ` ')}) == ~S(K="\\ \" $ ` '") <> "\n"
     end
 
     test "keeps newlines as real newlines" do
       assert EnvFile.encode(%{"K" => "a\nb"}) == ~s(K="a\nb"\n)
-    end
-
-    test "passes non-UTF-8 bytes through instead of raising" do
-      assert EnvFile.encode(%{"K" => <<0xFF, ?a>>}) == <<"K=\"", 0xFF, "a\"\n">>
     end
 
     test "rejects invalid names and NUL bytes without printing the value" do
@@ -45,6 +41,10 @@ defmodule Xamal.EnvFileTest do
 
       error = assert_raise ArgumentError, fn -> EnvFile.encode(%{"K" => "sec\0ret"}) end
       assert error.message =~ "NUL"
+      refute error.message =~ "sec"
+
+      error = assert_raise ArgumentError, fn -> EnvFile.encode(%{"K" => <<"sec", 0xFF>>}) end
+      assert error.message =~ "not valid UTF-8"
       refute error.message =~ "sec"
     end
   end

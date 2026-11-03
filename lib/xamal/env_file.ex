@@ -6,13 +6,18 @@ defmodule Xamal.EnvFile do
 
     * `encode/1` writes systemd's `EnvironmentFile=` format, read by the
       release's unit. Values are double-quoted, so newlines, spaces, and `#`
-      survive; `\\`, `"`, `$`, and `` ` `` are backslash-escaped.
+      survive. Only `\\` and `"` are escaped: systemd never expands `$` or
+      backticks, and systemd 241-246 keep the backslash of any other escape.
     * `encode_shell/1` writes `export KEY='value'` lines for `sh` to source
       (`mix xamal.app.exec`, `mix xamal.iex`). Single quotes stop the shell
       from expanding or running anything in a value.
 
   Never source the systemd file from a shell: the shell would expand `$` and
   backticks inside its double quotes.
+
+  Values read back exactly on systemd 239 and 247+. On 241-246 (Debian 10,
+  Ubuntu 20.04) every backslash in a value comes back doubled; no
+  double-quoted encoding is exact on both 239 and 241-246.
   """
 
   @doc """
@@ -63,16 +68,17 @@ defmodule Xamal.EnvFile do
     if String.contains?(value, <<0>>) do
       raise ArgumentError, "The value of env var #{key} contains a NUL byte"
     end
+
+    # systemd rejects the whole file on invalid UTF-8 and logs the value to
+    # the journal.
+    unless String.valid?(value) do
+      raise ArgumentError, "The value of env var #{key} is not valid UTF-8"
+    end
   end
 
-  # Inside double quotes systemd unescapes these four and keeps every other
-  # backslash. The replacements are byte-level, so non-UTF-8 values pass
-  # through unchanged.
   defp escape_systemd(value) do
     value
     |> String.replace("\\", "\\\\")
     |> String.replace("\"", "\\\"")
-    |> String.replace("$", "\\$")
-    |> String.replace("`", "\\`")
   end
 end
