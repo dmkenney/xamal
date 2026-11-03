@@ -297,21 +297,32 @@ defmodule Xamal.AppTasks do
   end
 
   defp upload_env_file(host, config, role) do
-    env = Configuration.Role.resolved_env(role, config.env)
-    env_content = EnvFile.encode(Configuration.Env.to_map(env))
+    env = role |> Configuration.Role.resolved_env(config.env) |> Configuration.Env.to_map()
     env_path = Configuration.Role.secrets_path(role, config)
 
     ssh_exec(host, CommandBase.make_directory(Path.dirname(env_path)), config)
 
-    # 0600: the file holds secrets, and systemd reads it as root.
-    case SSH.write_file(host, env_content, env_path, ssh_config: config.ssh, mode: 0o600) do
+    # systemd reads the .env file; app.exec sources the .sh file.
+    write_secret_file(host, config, env_path, EnvFile.encode(env))
+
+    write_secret_file(
+      host,
+      config,
+      Configuration.Role.shell_env_path(role, config),
+      EnvFile.encode_shell(env)
+    )
+
+    ssh_exec(host, Systemd.write_env_symlink(config, role), config)
+  end
+
+  # 0600: the files hold secrets, and systemd reads them as root.
+  defp write_secret_file(host, config, path, content) do
+    case SSH.write_file(host, content, path, ssh_config: config.ssh, mode: 0o600) do
       {:ok, _} ->
         :ok
 
       {:error, reason} ->
         raise "Failed to upload env file to #{host_label(config, host)}: #{inspect(reason)}"
     end
-
-    ssh_exec(host, Systemd.write_env_symlink(config, role), config)
   end
 end

@@ -56,6 +56,13 @@ defmodule Xamal.Configuration.Role do
     "#{Xamal.Configuration.env_directory(config)}/roles/#{name}.env"
   end
 
+  @doc """
+  The role's env file in shell format, sourced by `mix xamal.app.exec`.
+  """
+  def shell_env_path(%__MODULE__{name: name}, config) do
+    "#{Xamal.Configuration.env_directory(config)}/roles/#{name}.sh"
+  end
+
   # Private
 
   defp parse_role_config(config) when is_list(config) do

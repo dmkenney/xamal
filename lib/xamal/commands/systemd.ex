@@ -162,13 +162,15 @@ defmodule Xamal.Commands.Systemd do
   end
 
   @doc """
-  Create a symlink from env/app.env to the role-specific env file.
+  Symlink env/app.env and env/app.sh to the role's env files.
   """
   def write_env_symlink(config, role) do
-    role_env = Role.secrets_path(role, config)
-    app_env = "#{Configuration.env_directory(config)}/app.env"
+    env_dir = Configuration.env_directory(config)
 
-    ["ln", "-sfn", role_env, app_env]
+    combine([
+      ["ln", "-sfn", Role.secrets_path(role, config), "#{env_dir}/app.env"],
+      ["ln", "-sfn", Role.shell_env_path(role, config), "#{env_dir}/app.sh"]
+    ])
   end
 
   @doc """

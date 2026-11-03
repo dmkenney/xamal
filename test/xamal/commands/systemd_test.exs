@@ -206,15 +206,12 @@ defmodule Xamal.Commands.SystemdTest do
   end
 
   describe "write_env_symlink/2" do
-    test "symlinks role env to app.env" do
-      cmd = Systemd.write_env_symlink(@config, @role)
+    test "symlinks the role's env files to app.env and app.sh" do
+      cmd = Systemd.write_env_symlink(@config, @role) |> Enum.join(" ")
 
-      assert cmd == [
-               "ln",
-               "-sfn",
-               "/opt/xamal/my-app/env/roles/web.env",
-               "/opt/xamal/my-app/env/app.env"
-             ]
+      assert cmd ==
+               "ln -sfn /opt/xamal/my-app/env/roles/web.env /opt/xamal/my-app/env/app.env && " <>
+                 "ln -sfn /opt/xamal/my-app/env/roles/web.sh /opt/xamal/my-app/env/app.sh"
     end
   end
 end
