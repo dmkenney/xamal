@@ -131,6 +131,15 @@ defmodule Xamal.SSH.ConnectionPool do
       {:error, reason} ->
         {:error, {:ssh_connection_failed, host, port, reason}}
     end
+  rescue
+    # A raise here would crash the shared pool, and enough crashes stop the
+    # :xamal application. Report it as a failed connection instead. Only the
+    # exception type is kept: some messages (e.g. KeyError) print their term,
+    # which could be the connect options.
+    e ->
+      {:error,
+       {:ssh_connection_failed, host, port,
+        "unexpected #{inspect(e.__struct__)} while connecting"}}
   end
 
   # Close the target connection, then whatever its proxy opened.

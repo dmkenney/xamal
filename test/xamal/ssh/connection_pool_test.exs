@@ -55,20 +55,31 @@ defmodule Xamal.SSH.ConnectionPoolTest do
     end)
   end
 
-  test "a crash during checkout logs no key" do
-    # An unparseable proxy port raises inside handle_call.
+  test "an error while connecting returns an error and keeps the pool running" do
+    pool = Process.whereis(ConnectionPool)
+
+    # An unparseable proxy port raises inside connect. Configuration.new
+    # rejects it, so build the options directly.
     opts = Ssh.connect_options(Ssh.new(%{"key_data" => @key, "proxy" => "bastion:x"}))
 
     log =
       capture_log(fn ->
-        assert {:error, {:ssh_connection_failed, "10.0.0.1", 22, _}} =
-                 ConnectionPool.checkout("10.0.0.1", 22, "root", opts)
+        result = ConnectionPool.checkout("10.0.0.1", 22, "root", opts)
 
-        # Let the crash report reach the logger.
-        Process.sleep(100)
+        assert {:error, {:ssh_connection_failed, "10.0.0.1", 22, reason}} = result
+        assert reason =~ "ArgumentError"
+        refute inspect(result) =~ "PRIVATE KEY"
       end)
 
-    assert log =~ "terminating"
+    assert Process.whereis(ConnectionPool) == pool
     refute log =~ "PRIVATE KEY"
+  end
+
+  test "format_status/1 redacts the connect options in crash reports" do
+    opts = Ssh.connect_options(Ssh.new(%{"key_data" => @key}))
+    status = %{message: {:checkout, "10.0.0.1", 22, "root", opts}, state: %ConnectionPool{}}
+
+    assert %{message: {:checkout, "10.0.0.1", 22, "root", :redacted}} =
+             ConnectionPool.format_status(status)
   end
 end

@@ -20,6 +20,25 @@ defmodule Xamal.Configuration.Validator do
     raise ArgumentError, "Set only one of ssh.proxy and ssh.proxy_command"
   end
 
+  defp validate_ssh_proxy!(%{ssh: %{proxy: proxy}}) when is_binary(proxy) do
+    host_port = proxy |> String.split("@", parts: 2) |> List.last()
+
+    case String.split(host_port, ":", parts: 2) do
+      [_host] ->
+        :ok
+
+      [_host, port] ->
+        case Integer.parse(port) do
+          {port, ""} when port in 1..65_535 ->
+            :ok
+
+          _ ->
+            raise ArgumentError,
+                  "Invalid ssh.proxy #{inspect(proxy)}: the port must be a number from 1 to 65535"
+        end
+    end
+  end
+
   defp validate_ssh_proxy!(_config), do: :ok
 
   defp validate_service!(config) do

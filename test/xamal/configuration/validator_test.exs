@@ -31,6 +31,21 @@ defmodule Xamal.Configuration.ValidatorTest do
       assert Configuration.service(config) == "my-cool_app"
     end
 
+    test "rejects an ssh.proxy port that is not a number" do
+      for proxy <- ["bastion:x", "admin@bastion:22x", "bastion:0", "bastion:70000"] do
+        assert_raise ArgumentError, ~r/Invalid ssh.proxy/, fn ->
+          Configuration.new(Map.put(@valid_config, "ssh", %{"proxy" => proxy}))
+        end
+      end
+    end
+
+    test "accepts ssh.proxy with and without a port" do
+      for proxy <- ["bastion", "admin@bastion", "admin@bastion:2222"] do
+        assert %Configuration{} =
+                 Configuration.new(Map.put(@valid_config, "ssh", %{"proxy" => proxy}))
+      end
+    end
+
     test "rejects nil servers" do
       assert_raise ArgumentError, ~r/No servers/, fn ->
         Configuration.new(Map.put(@valid_config, "servers", nil))
