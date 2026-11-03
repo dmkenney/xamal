@@ -18,7 +18,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Xamal output, rotate it.
 - Pool failures now return a normal SSH connection error (for example "Xamal's
   SSH connection pool is not running; rerun the task") instead of raising.
-  This also covers interactive and streaming commands.
+- `mix xamal.app.exec -i`, `mix xamal.iex`, and `logs -f` (app and server)
+  now stop with an error when the SSH connection fails. Before, they printed
+  nothing and exited 0.
+- A config with no `service` now fails with "Missing service name" instead of a
+  `KeyError` that printed the whole config, including `ssh.key_data`.
 - Mix tasks now stop with a clear error if the `:xamal` application fails to
   start.
 - Config, role, env, and secrets structs no longer show secret values or the

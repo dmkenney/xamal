@@ -2,6 +2,7 @@ defmodule Xamal.SSH.ConnectionPoolTest do
   # Stops and crashes the app's shared pool.
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureIO
   import ExUnit.CaptureLog
 
   alias Xamal.Configuration.Ssh
@@ -25,6 +26,33 @@ defmodule Xamal.SSH.ConnectionPoolTest do
       end)
 
     refute log =~ "PRIVATE KEY"
+  end
+
+  test "follow logs and interactive exec fail loudly when the pool is down" do
+    :ok = Supervisor.terminate_child(Xamal.Supervisor, ConnectionPool)
+    on_exit(fn -> Supervisor.restart_child(Xamal.Supervisor, ConnectionPool) end)
+
+    config =
+      Xamal.Configuration.new(%{
+        "service" => "my-app",
+        "servers" => %{"web" => ["10.0.0.1"]},
+        "ssh" => %{"key_data" => @key}
+      })
+
+    context = Xamal.Context.new(config)
+
+    capture_io(fn ->
+      error =
+        assert_raise Mix.Error, ~r/Log stream failed on 10.0.0.1/, fn ->
+          Xamal.Logs.dispatch_logs([follow: true], fn _ -> ["true"] end, config, [], context)
+        end
+
+      refute error.message =~ "PRIVATE KEY"
+
+      assert_raise Mix.Error, ~r/Interactive command failed on 10.0.0.1/, fn ->
+        Xamal.AppTasks.exec(["-i", "true"], [], context)
+      end
+    end)
   end
 
   test "a crash during checkout logs no key" do
