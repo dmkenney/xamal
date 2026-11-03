@@ -32,9 +32,18 @@ defmodule Xamal.Commands.Builder do
   Same steps as `build_release/1`, but prefixed with a `cd` into the synced
   source directory — the local build inherits the project root as its working
   directory, a remote SSH command starts in the build user's home.
+
+  Installs Hex and rebar first if missing, as the Docker build does: without
+  Hex, `mix deps.get` asks to install it, and nothing answers over SSH, so
+  the build hangs until it times out.
   """
   def build_release_remote(config) do
-    combine([["cd", Configuration.build_directory(config)] | build_release_steps(config)])
+    combine([
+      ["cd", Configuration.build_directory(config)],
+      ["mix", "local.hex", "--if-missing", "--force"],
+      ["mix", "local.rebar", "--if-missing", "--force"]
+      | build_release_steps(config)
+    ])
   end
 
   @doc """

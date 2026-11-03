@@ -46,6 +46,14 @@ defmodule Xamal.Commands.BuilderTest do
       # come before any of the relative-path mix steps.
       assert String.starts_with?(cmd_str, "cd ~/.xamal/builds/my-app")
     end
+
+    test "installs Hex and rebar if missing before deps.get" do
+      cmd_str = Enum.join(Builder.build_release_remote(@config), " ")
+
+      assert cmd_str =~
+               "mix local.hex --if-missing --force && mix local.rebar --if-missing --force && " <>
+                 "MIX_ENV=prod mix deps.get"
+    end
   end
 
   describe "create_tarball_remote/1" do
