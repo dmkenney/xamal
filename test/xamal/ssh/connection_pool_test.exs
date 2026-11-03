@@ -82,4 +82,23 @@ defmodule Xamal.SSH.ConnectionPoolTest do
     assert %{message: {:checkout, "10.0.0.1", 22, "root", :redacted}} =
              ConnectionPool.format_status(status)
   end
+
+  test "an unreadable key file fails with an error naming the file" do
+    path = Path.join(System.tmp_dir!(), "deploy_key_#{System.unique_integer([:positive])}")
+    File.write!(path, @key)
+    File.chmod!(path, 0o000)
+    on_exit(fn -> File.rm(path) end)
+
+    # root can read a mode-000 file, so there is nothing to check.
+    if File.read(path) == {:error, :eacces} do
+      opts = Ssh.connect_options(Ssh.new(%{"keys" => [path]}))
+
+      assert {:error, {:ssh_connection_failed, "10.0.0.1", 22, reason}} =
+               ConnectionPool.checkout("10.0.0.1", 22, "root", opts)
+
+      assert reason =~ "cannot read SSH key #{path}"
+      assert reason =~ "permission denied"
+      refute reason =~ "PRIVATE KEY"
+    end
+  end
 end
