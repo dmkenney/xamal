@@ -303,7 +303,8 @@ defmodule Xamal.AppTasks do
 
     ssh_exec(host, CommandBase.make_directory(Path.dirname(env_path)), config)
 
-    case SSH.write_file(host, env_content, env_path, ssh_config: config.ssh) do
+    # 0600: the file holds secrets, and systemd reads it as root.
+    case SSH.write_file(host, env_content, env_path, ssh_config: config.ssh, mode: 0o600) do
       {:ok, _} ->
         :ok
 
