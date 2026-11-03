@@ -49,7 +49,6 @@ defmodule Xamal.Configuration.Ssh do
       user_interaction: false
     ]
     |> put_key_options(ssh)
-    |> put_config_options(ssh)
     |> put_proxy_options(ssh)
     |> Keyword.put(:connect_timeout, ssh.connect_timeout)
   end
@@ -94,9 +93,6 @@ defmodule Xamal.Configuration.Ssh do
     do: opts ++ [xamal_proxy_command: command]
 
   defp put_proxy_options(opts, _ssh), do: opts
-
-  defp put_config_options(opts, %{config: false}), do: opts ++ [ssh_config: :disabled]
-  defp put_config_options(opts, _ssh), do: opts
 
   defp parse_log_level(level) when is_binary(level) do
     case String.downcase(level) do

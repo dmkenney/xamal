@@ -85,6 +85,15 @@ defmodule Xamal.Configuration.SshTest do
       end
     end
 
+    # Erlang's :ssh never reads ~/.ssh/config, and it rejects unknown options,
+    # so `config: false` (accepted for Kamal compatibility) adds nothing.
+    test "config: false adds no option :ssh would reject" do
+      opts = Ssh.connect_options(Ssh.new(%{"config" => false}))
+
+      refute Keyword.has_key?(opts, :ssh_config)
+      refute match?({:error, {:options, _}}, :ssh.connect(~c"127.0.0.1", 1, opts, 1_000))
+    end
+
     test "uses :ssh defaults when no configured key exists on disk" do
       opts = Ssh.connect_options(Ssh.new(%{"keys" => ["/nonexistent/xamal/key"]}))
 
