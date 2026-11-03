@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `builder.remote` builds no longer hang on a build host without Hex. Xamal
+  now runs `mix local.hex --if-missing --force` and `mix local.rebar
+  --if-missing --force` before `mix deps.get`, as the Docker build already
+  did. Before, `mix deps.get` waited at the "Shall I install Hex?" prompt
+  until the build timed out.
+
 ## [0.7.2]
 
 ### Fixed
