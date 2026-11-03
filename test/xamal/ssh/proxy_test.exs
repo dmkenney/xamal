@@ -14,6 +14,15 @@ defmodule Xamal.SSH.ProxyTest do
     end
   end
 
+  describe "format_reason/1" do
+    test "formats every shape :ssh returns" do
+      assert Proxy.format_reason(~c"Unable to connect") == "Unable to connect"
+      assert Proxy.format_reason("refused") == "refused"
+      assert Proxy.format_reason(:econnrefused) == ":econnrefused"
+      assert Proxy.format_reason({:options, [x: 1]}) == "{:options, [x: 1]}"
+    end
+  end
+
   describe "expand_command/4" do
     test "substitutes host, port, and user like OpenSSH" do
       assert Proxy.expand_command("ssh -W %h:%p %r@bastion", "10.0.0.5", 22, "deploy") ==

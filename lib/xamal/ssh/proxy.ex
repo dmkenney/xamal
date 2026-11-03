@@ -116,10 +116,13 @@ defmodule Xamal.SSH.Proxy do
     end
   end
 
-  # :ssh reports errors as atoms, charlists, or strings.
-  defp format_reason(reason) when is_list(reason), do: to_string(reason)
-  defp format_reason(reason) when is_binary(reason), do: reason
-  defp format_reason(reason), do: inspect(reason)
+  @doc """
+  Format a connection error reason for output. :ssh reports errors as atoms,
+  charlists, strings, or tuples.
+  """
+  def format_reason(reason) when is_list(reason), do: to_string(reason)
+  def format_reason(reason) when is_binary(reason), do: reason
+  def format_reason(reason), do: inspect(reason)
 
   @doc """
   Split `"[user@]host[:port]"` into `{user, host, port}`. The user defaults to
