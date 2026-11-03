@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The env file is now uploaded over SFTP. Before, it was written with
+  `echo '<content>' > file`, so every secret showed in the server's process
+  list while the command ran, and a `'` in a secret broke the command.
+- A failed `$(...)` command substitution in the secrets file no longer puts
+  the command's output in the error. Its stderr now goes to the terminal
+  instead of into the secret value.
+- A secret that isn't valid UTF-8 no longer raises an error that prints part
+  of it. The env file keeps the bytes as they are.
+
 ## [0.7.1]
 
 ### Fixed
