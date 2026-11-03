@@ -27,6 +27,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   start.
 - Config, role, env, and secrets structs no longer show secret values or the
   raw config when inspected.
+- A bad host config, such as a non-numeric port in `ssh.proxy`, no longer
+  crashes the SSH connection pool. `ssh.proxy` ports are checked when the
+  config loads, and other errors while connecting return a connection error.
+  Before, repeated crashes stopped Xamal and every later command said to
+  rerun the task.
+- An unreadable `ssh.keys` file now fails with an error that names the file,
+  instead of a generic authentication failure.
+- `ssh.config: false` broke every connection on OTP 27 and later, which reject
+  the `ssh_config` option. Xamal no longer passes it. Erlang's `:ssh` never
+  reads `~/.ssh/config`, so the setting has no effect.
+- An SSH failure while taking the deploy lock no longer raises a second error
+  when the reason is a tuple.
 
 ## [0.7.0]
 

@@ -7,6 +7,7 @@ defmodule Xamal.DeployLock do
   alias Xamal.Commands.Lock
   alias Xamal.Context
   alias Xamal.LocalIdentity
+  alias Xamal.SSH.Proxy
 
   @spec with_lock(Context.t(), (-> result) | (Context.t() -> result)) :: result
         when result: term()
@@ -43,7 +44,11 @@ defmodule Xamal.DeployLock do
         :ok
 
       {:error, {:ssh_connection_failed, hostname, port, reason}} ->
-        say("SSH connection failed to #{hostname}:#{port} (#{reason})", :red)
+        say(
+          "SSH connection failed to #{hostname}:#{port} (#{Proxy.format_reason(reason)})",
+          :red
+        )
+
         say("Verify the host is reachable and SSH is running.", :red)
         raise "SSH connection failed to #{hostname}:#{port}"
 

@@ -124,12 +124,33 @@ defmodule Xamal.SSH.ConnectionPool do
       [silently_accept_hosts: true, user_interaction: false] ++
         connect_opts
 
-    case Proxy.connect(host, port, opts, timeout) do
-      {:ok, conn, cleanup} ->
-        {:ok, conn, cleanup}
-
+    with :ok <- check_key_file(connect_opts),
+         {:ok, conn, cleanup} <- Proxy.connect(host, port, opts, timeout) do
+      {:ok, conn, cleanup}
+    else
       {:error, reason} ->
         {:error, {:ssh_connection_failed, host, port, reason}}
+    end
+  rescue
+    # A raise here would crash the shared pool, and enough crashes stop the
+    # :xamal application. Report it as a failed connection instead. Only the
+    # exception type is kept: some messages (e.g. KeyError) print their term,
+    # which could be the connect options.
+    e ->
+      {:error,
+       {:ssh_connection_failed, host, port,
+        "unexpected #{inspect(e.__struct__)} while connecting"}}
+  end
+
+  # :ssh reads the key through KeyProvider, but drops its error and reports
+  # only that no auth method worked. Check the file first so the error names it.
+  defp check_key_file(connect_opts) do
+    with {Xamal.SSH.KeyProvider, private} <- Keyword.get(connect_opts, :key_cb),
+         path when is_binary(path) <- private[:key_file],
+         {:error, reason} <- File.open(path, [:read], fn _ -> :ok end) do
+      {:error, "cannot read SSH key #{path}: #{:file.format_error(reason)}"}
+    else
+      _ -> :ok
     end
   end
 
