@@ -73,6 +73,12 @@ defmodule Xamal.EnvFileTest do
     @describetag :tmp_dir
 
     test "systemd reads every value back exactly", %{tmp_dir: dir} do
+      {version_output, 0} = System.cmd("systemctl", ["--version"])
+      [_, version] = Regex.run(~r/^systemd (\d+)/, version_output)
+
+      # Documented: systemd 241-246 keep both backslashes of \\.
+      doubles_backslashes? = String.to_integer(version) in 241..246
+
       path = Path.join(dir, "app.env")
       File.write!(path, EnvFile.encode(@nasty))
 
@@ -94,7 +100,11 @@ defmodule Xamal.EnvFileTest do
         |> Map.new(fn line -> line |> String.split("=", parts: 2) |> List.to_tuple() end)
 
       for {key, value} <- @nasty do
-        assert env[key] == value, "#{key}: expected #{inspect(value)}, got #{inspect(env[key])}"
+        expected =
+          if doubles_backslashes?, do: String.replace(value, "\\", "\\\\"), else: value
+
+        assert env[key] == expected,
+               "#{key}: expected #{inspect(expected)}, got #{inspect(env[key])}"
       end
     end
   end
