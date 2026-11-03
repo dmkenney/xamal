@@ -67,7 +67,7 @@ defmodule Xamal.SecretsTest do
   @tag :tmp_dir
   test "a failed command substitution does not put its output in the error", %{tmp_dir: dir} do
     secrets_path = Path.join(dir, "secrets")
-    File.write!(secrets_path, "TOKEN=$(printf %s%s parti al_secret; exit 3)\n")
+    File.write!(secrets_path, "TOKEN=LITERAL_PW$(printf %s%s parti al_secret; exit 3)\n")
 
     # The substitution runs in a linked task, so run it in its own process
     # and read the exit, which is what Mix prints.
@@ -86,6 +86,8 @@ defmodule Xamal.SecretsTest do
     assert message =~ "exit 3"
     refute message =~ "partial_secret"
     refute log =~ "partial_secret"
+    refute message =~ "LITERAL_PW"
+    refute log =~ "LITERAL_PW"
   end
 
   @tag :tmp_dir

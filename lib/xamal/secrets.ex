@@ -113,14 +113,26 @@ defmodule Xamal.Secrets do
     if needs_sub == [] do
       Map.new(plain)
     else
+      # A raise inside the task would log a crash report whose args hold the
+      # raw line, which can contain literal secrets. Return the error and
+      # raise here instead.
       resolved =
         needs_sub
         |> Task.async_stream(
-          fn {key, value} -> {key, substitute_commands(value)} end,
+          fn {key, value} ->
+            try do
+              {:ok, {key, substitute_commands(value)}}
+            rescue
+              e in RuntimeError -> {:error, Exception.message(e)}
+            end
+          end,
           max_concurrency: 20,
           timeout: 30_000
         )
-        |> Enum.map(fn {:ok, result} -> result end)
+        |> Enum.map(fn
+          {:ok, {:ok, result}} -> result
+          {:ok, {:error, message}} -> raise message
+        end)
 
       Map.new(plain ++ resolved)
     end
