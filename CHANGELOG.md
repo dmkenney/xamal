@@ -6,8 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.2]
+
 ### Fixed
 
+- The env file is now uploaded over SFTP. Before, it was written with
+  `echo '<content>' > file`, so every secret showed in the server's process
+  list while the command ran, and a `'` in a secret broke the command.
+- The env file is now created with mode 0600. Before, it was 0644, so any user
+  on the server could read the secrets. Existing env files are tightened on
+  the next deploy.
 - The env file is now written in a format systemd reads back exactly. Values
   are double-quoted, so newlines (such as in a PEM key), leading and trailing
   spaces, and `#` survive. Before, systemd turned `\n` into `n` and stripped
@@ -21,29 +29,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   behavior until their next deploy.
 - Env var names that systemd or the shell can't use, and values with a NUL
   byte or invalid UTF-8, now fail the deploy with an error that names the key
-  but not the value. Before, systemd dropped such names, and on invalid UTF-8
-  it ignored the whole env file and logged the value to the journal.
-
-### Removed
-
-- `Xamal.Commands.App.start/3` and `start_version/4`, which were unused and
-  sourced the env file through the shell.
-
-### Fixed
-
-- The env file is now uploaded over SFTP. Before, it was written with
-  `echo '<content>' > file`, so every secret showed in the server's process
-  list while the command ran, and a `'` in a secret broke the command.
-- The env file is now created with mode 0600. Before, it was 0644, so any user
-  on the server could read the secrets. Existing env files are tightened on
-  the next deploy.
+  but not the value. Before, systemd dropped such names, and a non-UTF-8 value
+  raised an error that printed part of it, or made systemd ignore the whole
+  env file and log the value to the journal.
 - A failed `$(...)` command substitution in the secrets file no longer puts
   the command's output, or any literal text around the `$(...)`, in the error
   or the log. The error still names the command, so keep secrets out of the
   command itself. Its stderr now goes to the terminal instead of into the
   secret value.
-- A secret that isn't valid UTF-8 no longer raises an error that prints part
-  of it. The env file keeps the bytes as they are.
+
+### Removed
+
+- `Xamal.Commands.App.start/3` and `start_version/4`, which were unused and
+  sourced the env file through the shell.
 
 ## [0.7.1]
 
@@ -301,6 +299,7 @@ See [UPGRADING.md](UPGRADING.md) for step-by-step migration instructions.
 
 - Initial release.
 
+[0.7.2]: https://github.com/dmkenney/xamal/releases/tag/v0.7.2
 [0.7.1]: https://github.com/dmkenney/xamal/releases/tag/v0.7.1
 [0.7.0]: https://github.com/dmkenney/xamal/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dmkenney/xamal/releases/tag/v0.6.0
