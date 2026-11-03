@@ -598,6 +598,14 @@ defmodule Xamal.SSH do
           else
             {:error, reason} -> {:error, {:sftp_write_failed, remote_path, reason}}
           end
+        rescue
+          # OTP 26-27 raise a MatchError on an SFTP timeout instead of
+          # returning it.
+          e in MatchError -> {:error, {:sftp_write_failed, remote_path, match_reason(e.term)}}
+        catch
+          # A channel exit reason can hold the call's arguments, which include
+          # the content. Drop it.
+          :exit, _reason -> {:error, {:sftp_write_failed, remote_path, :channel_exited}}
         after
           :ssh_sftp.stop_channel(sftp)
         end
@@ -607,13 +615,24 @@ defmodule Xamal.SSH do
     end
   end
 
+  defp match_reason({:error, reason}), do: reason
+  defp match_reason(_term), do: :unexpected_reply
+
   defp set_mode(_sftp, _path, nil, _timeout), do: :ok
 
-  # Create the file (keeping any content) and set its mode before writing.
+  # Set the mode before writing, so the content is never readable with looser
+  # permissions. Change an existing file in place; opening it would truncate
+  # it, and a failed chmod would then leave it empty.
   defp set_mode(sftp, path, mode, timeout) do
-    with {:ok, handle} <- :ssh_sftp.open(sftp, path, [:write, :creat], timeout),
-         :ok <- :ssh_sftp.close(sftp, handle, timeout) do
-      :ssh_sftp.write_file_info(sftp, path, file_info(mode: mode), timeout)
+    case :ssh_sftp.write_file_info(sftp, path, file_info(mode: mode), timeout) do
+      {:error, :no_such_file} ->
+        with {:ok, handle} <- :ssh_sftp.open(sftp, path, [:write], timeout),
+             :ok <- :ssh_sftp.close(sftp, handle, timeout) do
+          :ssh_sftp.write_file_info(sftp, path, file_info(mode: mode), timeout)
+        end
+
+      result ->
+        result
     end
   end
 end

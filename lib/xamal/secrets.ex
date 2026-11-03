@@ -124,6 +124,7 @@ defmodule Xamal.Secrets do
               {:ok, {key, substitute_commands(value)}}
             rescue
               e in RuntimeError -> {:error, Exception.message(e)}
+              e -> {:error, "Command substitution failed for #{key}: #{inspect(e.__struct__)}"}
             end
           end,
           max_concurrency: 20,
