@@ -8,6 +8,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The env file is now written in a format systemd reads back exactly. Values
+  are double-quoted, so newlines (such as in a PEM key), leading and trailing
+  spaces, and `#` survive. Before, systemd turned `\n` into `n` and stripped
+  surrounding spaces.
+- `mix xamal.app.exec` and `mix xamal.iex` no longer source the env file as
+  shell code. Before, a secret like `pa$sword;touch /x` set `pa` and ran
+  `touch` on the server, and a `"` in a secret printed part of it in an error.
+  Xamal now also writes `env/app.sh` with every value single-quoted, mode
+  0600, and sources that. Hosts not deployed since this change keep the old
+  behavior until their next deploy.
+- Env var names that systemd or the shell can't use, and values with a NUL
+  byte, now fail the deploy with an error that names the key but not the
+  value.
+
+### Removed
+
+- `Xamal.Commands.App.start/3` and `start_version/4`, which were unused and
+  sourced the env file through the shell.
+
+### Fixed
+
 - The env file is now uploaded over SFTP. Before, it was written with
   `echo '<content>' > file`, so every secret showed in the server's process
   list while the command ran, and a `'` in a secret broke the command.

@@ -3,58 +3,108 @@ defmodule Xamal.EnvFileTest do
 
   alias Xamal.EnvFile
 
-  describe "encode/1" do
-    test "generates KEY=value lines" do
-      env = %{"FOO" => "bar", "BAZ" => "qux"}
-      result = EnvFile.encode(env)
-      assert result =~ "BAZ=qux\n"
-      assert result =~ "FOO=bar\n"
-    end
+  # Values that broke the old format or the shell: quotes, expansions,
+  # command separators, newlines, and surrounding spaces.
+  @nasty %{
+    "QUOTES" => ~s(it's "q"),
+    "EXPAND" => "$HOME ${PATH} `id` $(id)",
+    "INJECT" => "pa$sword;touch /tmp/xamal-pwned",
+    "BACKSLASH" => "a\\nb\\\\c\\",
+    "MULTILINE" => "-----BEGIN KEY-----\nline2\n-----END KEY-----\n",
+    "SPACES" => "  lead and trail  ",
+    "HASH" => "# not a comment",
+    "UNICODE" => "café ✓",
+    "EMPTY" => ""
+  }
 
-    test "sorts keys alphabetically" do
-      env = %{"Z" => "1", "A" => "2"}
-      result = EnvFile.encode(env)
-      assert result == "A=2\nZ=1\n"
+  describe "encode/1" do
+    test "writes double-quoted KEY=value lines sorted by key" do
+      assert EnvFile.encode(%{"Z" => "1", "A" => "two"}) == ~s(A="two"\nZ="1"\n)
     end
 
     test "returns newline for empty map" do
       assert EnvFile.encode(%{}) == "\n"
     end
 
-    test "escapes backslashes" do
-      assert EnvFile.encode(%{"K" => "a\\b"}) == "K=a\\\\b\n"
+    test "escapes backslash, double quote, dollar, and backtick" do
+      assert EnvFile.encode(%{"K" => ~S(\ " $ `)}) == ~S(K="\\ \" \$ \`") <> "\n"
     end
 
-    test "escapes newlines" do
-      assert EnvFile.encode(%{"K" => "line1\nline2"}) == "K=line1\\nline2\n"
-    end
-
-    test "escapes double quotes" do
-      assert EnvFile.encode(%{"K" => ~s(say "hi")}) == ~s(K=say \\"hi\\"\n)
-    end
-
-    test "preserves non-ASCII characters" do
-      assert EnvFile.encode(%{"K" => "café"}) == "K=café\n"
+    test "keeps newlines as real newlines" do
+      assert EnvFile.encode(%{"K" => "a\nb"}) == ~s(K="a\nb"\n)
     end
 
     test "passes non-UTF-8 bytes through instead of raising" do
-      assert EnvFile.encode(%{"K" => <<0xFF, 0xFE, ?a, ?\n>>}) == <<"K=", 0xFF, 0xFE, "a\\n\n">>
+      assert EnvFile.encode(%{"K" => <<0xFF, ?a>>}) == <<"K=\"", 0xFF, "a\"\n">>
+    end
+
+    test "rejects invalid names and NUL bytes without printing the value" do
+      error = assert_raise ArgumentError, fn -> EnvFile.encode(%{"A;B" => "secret"}) end
+      assert error.message =~ "Invalid env var name"
+      refute error.message =~ "secret"
+
+      error = assert_raise ArgumentError, fn -> EnvFile.encode(%{"K" => "sec\0ret"}) end
+      assert error.message =~ "NUL"
+      refute error.message =~ "sec"
+    end
+  end
+
+  describe "encode_shell/1" do
+    test "writes single-quoted export lines" do
+      assert EnvFile.encode_shell(%{"K" => "it's"}) == "export K='it'\\''s'\n"
+    end
+
+    @tag :tmp_dir
+    test "the shell reads every value back exactly and runs nothing", %{tmp_dir: dir} do
+      path = Path.join(dir, "app.sh")
+      File.write!(path, EnvFile.encode_shell(@nasty))
+
+      for {key, value} <- @nasty do
+        assert {^value, 0} =
+                 System.cmd("sh", ["-c", ~s(. "$1" && printf %s "$#{key}"), "sh", path])
+      end
+
+      refute File.exists?("/tmp/xamal-pwned")
+    end
+  end
+
+  describe "systemd parsing" do
+    @describetag :systemd
+    @describetag :tmp_dir
+
+    test "systemd reads every value back exactly", %{tmp_dir: dir} do
+      path = Path.join(dir, "app.env")
+      File.write!(path, EnvFile.encode(@nasty))
+
+      {output, 0} =
+        System.cmd("systemd-run", [
+          "--user",
+          "--quiet",
+          "--pipe",
+          "--wait",
+          "-p",
+          "EnvironmentFile=#{path}",
+          "/usr/bin/env",
+          "-0"
+        ])
+
+      env =
+        output
+        |> String.split(<<0>>, trim: true)
+        |> Map.new(fn line -> line |> String.split("=", parts: 2) |> List.to_tuple() end)
+
+      for {key, value} <- @nasty do
+        assert env[key] == value, "#{key}: expected #{inspect(value)}, got #{inspect(env[key])}"
+      end
     end
   end
 
   describe "write!/2" do
     @tag :tmp_dir
-    test "writes env file to disk", %{tmp_dir: dir} do
-      path = Path.join(dir, "test.env")
-      EnvFile.write!(%{"FOO" => "bar"}, path)
-      assert File.read!(path) == "FOO=bar\n"
-    end
-
-    @tag :tmp_dir
-    test "creates parent directories", %{tmp_dir: dir} do
+    test "writes the systemd format and creates parent directories", %{tmp_dir: dir} do
       path = Path.join([dir, "a", "b", "test.env"])
-      EnvFile.write!(%{"X" => "1"}, path)
-      assert File.read!(path) == "X=1\n"
+      EnvFile.write!(%{"FOO" => "bar"}, path)
+      assert File.read!(path) == ~s(FOO="bar"\n)
     end
   end
 end

@@ -1,50 +1,11 @@
 defmodule Xamal.Commands.App do
   @moduledoc """
-  Release lifecycle commands: start, stop, status, version, exec, logs.
+  Release lifecycle commands: stop, status, version, exec, logs.
   """
 
   import Xamal.Commands.Base
 
   alias Xamal.Configuration
-  alias Xamal.Configuration.Role
-
-  @doc """
-  Start the release as a daemon on a given port.
-
-  Sources the role env file, sets PORT, then runs `bin/<app> daemon`.
-  """
-  def start(config, role, port) do
-    bin = release_bin(config)
-    env_file = Role.secrets_path(role, config)
-    service_dir = Configuration.service_directory(config)
-    release_name = config.release.name
-
-    combine([
-      ["set", "-a"],
-      [".", env_file],
-      ["set", "+a"],
-      ["cd", "#{service_dir}/current"],
-      ["PORT=#{port}", "RELEASE_NODE=#{release_name}_#{port}", bin, "daemon"]
-    ])
-  end
-
-  @doc """
-  Start a specific release version on a given port.
-  """
-  def start_version(config, role, version, port) do
-    bin = release_bin(config)
-    env_file = Role.secrets_path(role, config)
-    release_dir = "#{Configuration.releases_directory(config)}/#{version}"
-    release_name = config.release.name
-
-    combine([
-      ["set", "-a"],
-      [".", env_file],
-      ["set", "+a"],
-      ["cd", release_dir],
-      ["PORT=#{port}", "RELEASE_NODE=#{release_name}_#{port}", bin, "daemon"]
-    ])
-  end
 
   @doc """
   Stop the running release.
@@ -101,12 +62,18 @@ defmodule Xamal.Commands.App do
     port = Keyword.get(opts, :port)
     bin = release_bin(config)
     current = Configuration.current_link(config)
-    env_file = "#{Configuration.env_directory(config)}/app.env"
+    env_dir = Configuration.env_directory(config)
 
-    # Source the env file so runtime.exs has the required env vars,
-    # and set RELEASE_NODE so we connect to the correct node.
+    # Load the env so runtime.exs has the required vars, and set RELEASE_NODE
+    # so we connect to the correct node. app.sh quotes every value, so the
+    # shell runs nothing from it. Hosts not deployed since app.sh was added
+    # only have app.env, which is sourced the old way until the next deploy.
+    load_env =
+      "if [ -f #{env_dir}/app.sh ]; then . #{env_dir}/app.sh; " <>
+        "else set -a; . #{env_dir}/app.env; set +a; fi"
+
     env_prefix =
-      ["set -a", ". #{env_file}", "set +a"] ++
+      [load_env] ++
         if(port, do: ["export RELEASE_NODE=#{config.release.name}_#{port}"], else: [])
 
     shell_prefix = Enum.join(env_prefix, " && ")

@@ -16,26 +16,6 @@ defmodule Xamal.Commands.AppTest do
     health_check: %Xamal.Configuration.HealthCheck{}
   }
 
-  @role %Xamal.Configuration.Role{name: "web", hosts: ["1.2.3.4"]}
-
-  describe "start/3" do
-    test "builds daemon start command" do
-      cmd = App.start(@config, @role, 4000)
-      cmd_str = Enum.join(cmd, " ")
-
-      assert cmd_str =~ "bin/my_app"
-      assert cmd_str =~ "daemon"
-      assert cmd_str =~ "PORT=4000"
-    end
-
-    test "sources env file" do
-      cmd = App.start(@config, @role, 4000)
-      cmd_str = Enum.join(cmd, " ")
-
-      assert cmd_str =~ "/opt/xamal/my-app/env/roles/web.env"
-    end
-  end
-
   describe "stop/1" do
     test "builds stop command" do
       cmd = App.stop(@config)
@@ -64,6 +44,14 @@ defmodule Xamal.Commands.AppTest do
       cmd_str = Enum.join(cmd, " ")
 
       assert cmd_str =~ "rpc"
+    end
+
+    test "sources app.sh, falling back to app.env on hosts without it" do
+      cmd_str = @config |> App.exec("MyApp.hello()") |> Enum.join(" ")
+
+      assert cmd_str =~
+               "if [ -f /opt/xamal/my-app/env/app.sh ]; then . /opt/xamal/my-app/env/app.sh; " <>
+                 "else set -a; . /opt/xamal/my-app/env/app.env; set +a; fi"
     end
 
     test "interactive uses remote" do
