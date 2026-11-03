@@ -36,6 +36,10 @@ defmodule Xamal.EnvFileTest do
     test "preserves non-ASCII characters" do
       assert EnvFile.encode(%{"K" => "café"}) == "K=café\n"
     end
+
+    test "passes non-UTF-8 bytes through instead of raising" do
+      assert EnvFile.encode(%{"K" => <<0xFF, 0xFE, ?a, ?\n>>}) == <<"K=", 0xFF, 0xFE, "a\\n\n">>
+    end
   end
 
   describe "write!/2" do
