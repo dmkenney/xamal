@@ -85,7 +85,7 @@ defmodule Xamal.Configuration do
 
     config = %__MODULE__{
       raw_config: raw_config,
-      service: Map.fetch!(raw_config, "service"),
+      service: Map.get(raw_config, "service"),
       destination: destination,
       version: version || version_from_config(raw_config),
       hooks_path: Map.get(raw_config, "hooks_path", ".xamal/hooks"),
@@ -115,7 +115,7 @@ defmodule Xamal.Configuration do
   # Accessors
 
   def service(%__MODULE__{service: service}) when is_binary(service), do: service
-  def service(%__MODULE__{raw_config: raw}), do: Map.fetch!(raw, "service")
+  def service(%__MODULE__{raw_config: raw}), do: Map.get(raw, "service")
 
   def hooks_path(%__MODULE__{hooks_path: hooks_path}) when is_binary(hooks_path), do: hooks_path
   def hooks_path(%__MODULE__{raw_config: raw}), do: Map.get(raw, "hooks_path", ".xamal/hooks")
