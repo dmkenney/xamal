@@ -302,7 +302,15 @@ defmodule Xamal.AppTasks do
     env_path = Configuration.Role.secrets_path(role, config)
 
     ssh_exec(host, CommandBase.make_directory(Path.dirname(env_path)), config)
-    ssh_exec(host, CommandBase.write([["echo", "'#{env_content}'"], [env_path]]), config)
+
+    case SSH.write_file(host, env_content, env_path, ssh_config: config.ssh) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        raise "Failed to upload env file to #{host_label(config, host)}: #{inspect(reason)}"
+    end
+
     ssh_exec(host, Systemd.write_env_symlink(config, role), config)
   end
 end

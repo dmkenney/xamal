@@ -94,17 +94,32 @@ defmodule Xamal.SSH do
         if scp_available?() do
           upload_via_scp(key_path, ssh_config, hostname, port, local_path, remote_path)
         else
-          upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path)
+          write_via_sftp_pooled(ssh_config, hostname, port, File.read!(local_path), remote_path)
         end
 
       :none ->
-        upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path)
+        write_via_sftp_pooled(ssh_config, hostname, port, File.read!(local_path), remote_path)
     end
+  end
+
+  @doc """
+  Write `content` to `remote_path` over SFTP.
+
+  The content never appears on a command line, so use this for anything
+  secret, such as env files. A command like `echo '...' > file` shows its
+  arguments in the server's process list.
+  """
+  def write_file(host, content, remote_path, opts \\ []) do
+    ssh_config = Keyword.get(opts, :ssh_config, %Ssh{})
+    hostname = Host.hostname(host)
+    port = Host.port(host, ssh_config)
+
+    write_via_sftp_pooled(ssh_config, hostname, port, content, remote_path)
   end
 
   defp scp_available?, do: System.find_executable("scp") != nil
 
-  defp upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path) do
+  defp write_via_sftp_pooled(ssh_config, hostname, port, content, remote_path) do
     checkout_result =
       ConnectionPool.checkout(
         hostname,
@@ -115,7 +130,7 @@ defmodule Xamal.SSH do
 
     with {:ok, conn} <- checkout_result do
       try do
-        upload_via_sftp(conn, local_path, remote_path)
+        write_via_sftp(conn, content, remote_path)
       after
         ConnectionPool.checkin(hostname, port, ssh_config.user)
       end
@@ -554,12 +569,11 @@ defmodule Xamal.SSH do
     end
   end
 
-  defp upload_via_sftp(conn, local_path, remote_path) do
+  defp write_via_sftp(conn, content, remote_path) do
     {:ok, sftp} = :ssh_sftp.start_channel(conn)
 
     try do
-      content = File.read!(local_path)
-      :ok = :ssh_sftp.write_file(sftp, String.to_charlist(remote_path), content)
+      :ok = :ssh_sftp.write_file(sftp, String.to_charlist(sftp_path(remote_path)), content)
       {:ok, remote_path}
     after
       :ssh_sftp.stop_channel(sftp)
