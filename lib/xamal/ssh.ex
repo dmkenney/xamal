@@ -9,6 +9,9 @@ defmodule Xamal.SSH do
   alias Xamal.Configuration.{Boot, Ssh}
   alias Xamal.SSH.{ConnectionPool, Host, Proxy, Runner}
 
+  require Record
+  Record.defrecordp(:file_info, Record.extract(:file_info, from_lib: "kernel/include/file.hrl"))
+
   @doc """
   Execute a function on each host in parallel.
   Returns list of {host, result} tuples.
@@ -94,17 +97,44 @@ defmodule Xamal.SSH do
         if scp_available?() do
           upload_via_scp(key_path, ssh_config, hostname, port, local_path, remote_path)
         else
-          upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path)
+          write_via_sftp_pooled(
+            ssh_config,
+            hostname,
+            port,
+            File.read!(local_path),
+            remote_path,
+            []
+          )
         end
 
       :none ->
-        upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path)
+        write_via_sftp_pooled(ssh_config, hostname, port, File.read!(local_path), remote_path, [])
     end
+  end
+
+  @doc """
+  Write `content` to `remote_path` over SFTP.
+
+  The content never appears on a command line, so use this for anything
+  secret, such as env files. A command like `echo '...' > file` shows its
+  arguments in the server's process list.
+
+  Options: `:mode` sets the file mode before the content is written, so the
+  content is never readable with looser permissions; `:timeout` (default
+  30s) bounds each SFTP operation.
+  """
+  def write_file(host, content, remote_path, opts \\ []) do
+    ssh_config = Keyword.get(opts, :ssh_config, %Ssh{})
+    hostname = Host.hostname(host)
+    port = Host.port(host, ssh_config)
+    sftp_opts = [mode: Keyword.get(opts, :mode), timeout: Keyword.get(opts, :timeout, 30_000)]
+
+    write_via_sftp_pooled(ssh_config, hostname, port, content, remote_path, sftp_opts)
   end
 
   defp scp_available?, do: System.find_executable("scp") != nil
 
-  defp upload_via_sftp_pooled(ssh_config, hostname, port, local_path, remote_path) do
+  defp write_via_sftp_pooled(ssh_config, hostname, port, content, remote_path, sftp_opts) do
     checkout_result =
       ConnectionPool.checkout(
         hostname,
@@ -115,7 +145,7 @@ defmodule Xamal.SSH do
 
     with {:ok, conn} <- checkout_result do
       try do
-        upload_via_sftp(conn, local_path, remote_path)
+        write_via_sftp(conn, content, remote_path, sftp_opts)
       after
         ConnectionPool.checkin(hostname, port, ssh_config.user)
       end
@@ -554,15 +584,55 @@ defmodule Xamal.SSH do
     end
   end
 
-  defp upload_via_sftp(conn, local_path, remote_path) do
-    {:ok, sftp} = :ssh_sftp.start_channel(conn)
+  # Release tarballs can take minutes over SFTP, so uploads pass no timeout.
+  defp write_via_sftp(conn, content, remote_path, opts) do
+    timeout = Keyword.get(opts, :timeout) || :infinity
+    path = String.to_charlist(sftp_path(remote_path))
 
-    try do
-      content = File.read!(local_path)
-      :ok = :ssh_sftp.write_file(sftp, String.to_charlist(remote_path), content)
-      {:ok, remote_path}
-    after
-      :ssh_sftp.stop_channel(sftp)
+    case :ssh_sftp.start_channel(conn, timeout: timeout) do
+      {:ok, sftp} ->
+        try do
+          with :ok <- set_mode(sftp, path, Keyword.get(opts, :mode), timeout),
+               :ok <- :ssh_sftp.write_file(sftp, path, content, timeout) do
+            {:ok, remote_path}
+          else
+            {:error, reason} -> {:error, {:sftp_write_failed, remote_path, reason}}
+          end
+        rescue
+          # OTP 26-27 raise a MatchError on an SFTP timeout instead of
+          # returning it.
+          e in MatchError -> {:error, {:sftp_write_failed, remote_path, match_reason(e.term)}}
+        catch
+          # A channel exit reason can hold the call's arguments, which include
+          # the content. Drop it.
+          :exit, _reason -> {:error, {:sftp_write_failed, remote_path, :channel_exited}}
+        after
+          :ssh_sftp.stop_channel(sftp)
+        end
+
+      {:error, reason} ->
+        {:error, {:sftp_write_failed, remote_path, reason}}
+    end
+  end
+
+  defp match_reason({:error, reason}), do: reason
+  defp match_reason(_term), do: :unexpected_reply
+
+  defp set_mode(_sftp, _path, nil, _timeout), do: :ok
+
+  # Set the mode before writing, so the content is never readable with looser
+  # permissions. Change an existing file in place; opening it would truncate
+  # it, and a failed chmod would then leave it empty.
+  defp set_mode(sftp, path, mode, timeout) do
+    case :ssh_sftp.write_file_info(sftp, path, file_info(mode: mode), timeout) do
+      {:error, :no_such_file} ->
+        with {:ok, handle} <- :ssh_sftp.open(sftp, path, [:write], timeout),
+             :ok <- :ssh_sftp.close(sftp, handle, timeout) do
+          :ssh_sftp.write_file_info(sftp, path, file_info(mode: mode), timeout)
+        end
+
+      result ->
+        result
     end
   end
 end

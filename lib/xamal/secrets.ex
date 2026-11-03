@@ -113,14 +113,27 @@ defmodule Xamal.Secrets do
     if needs_sub == [] do
       Map.new(plain)
     else
+      # A raise inside the task would log a crash report whose args hold the
+      # raw line, which can contain literal secrets. Return the error and
+      # raise here instead.
       resolved =
         needs_sub
         |> Task.async_stream(
-          fn {key, value} -> {key, substitute_commands(value)} end,
+          fn {key, value} ->
+            try do
+              {:ok, {key, substitute_commands(value)}}
+            rescue
+              e in RuntimeError -> {:error, Exception.message(e)}
+              e -> {:error, "Command substitution failed for #{key}: #{inspect(e.__struct__)}"}
+            end
+          end,
           max_concurrency: 20,
           timeout: 30_000
         )
-        |> Enum.map(fn {:ok, result} -> result end)
+        |> Enum.map(fn
+          {:ok, {:ok, result}} -> result
+          {:ok, {:error, message}} -> raise message
+        end)
 
       Map.new(plain ++ resolved)
     end
@@ -151,9 +164,12 @@ defmodule Xamal.Secrets do
     Regex.replace(~r/\$\(([^)]+)\)/, value, fn _full, cmd ->
       cmd = String.trim(cmd)
 
-      case System.cmd("sh", ["-c", cmd], stderr_to_stdout: true) do
+      # stdout is the secret, so it stays out of the error. stderr is not
+      # captured: it goes to the terminal, where the tool's own error shows,
+      # and it can't end up in the secret value.
+      case System.cmd("sh", ["-c", cmd]) do
         {output, 0} -> String.trim(output)
-        {error, _} -> raise "Command substitution failed for '#{cmd}': #{error}"
+        {_output, status} -> raise "Command substitution failed for '#{cmd}' (exit #{status})"
       end
     end)
   end
